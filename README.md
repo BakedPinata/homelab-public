@@ -2,7 +2,7 @@
 
 Docker services for the home server (CDM-PC). Media, photos and backups live on the Synology NAS.
 
-> Work in progress. Architecture diagrams and the disaster-recovery pack are added in later phases.
+> Work in progress (import test). Architecture diagrams and the disaster-recovery pack are added in later phases.
 
 ## Where things are
 | Path | What |
