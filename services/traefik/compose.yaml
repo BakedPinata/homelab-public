@@ -44,17 +44,17 @@ services:
       socket: {}
       default: {}
 
-  # Reads Traefik's access log, bans attacking IPs; the crowdsec middleware asks it on every public request
+  # Reads Traefik's access log and app login failures, bans attacking IPs; the crowdsec middleware asks it on every public request
   crowdsec:
     image: crowdsecurity/crowdsec:v1.8.1
     container_name: crowdsec
     restart: unless-stopped
     environment:
       - TZ=${TZ}
-      - COLLECTIONS=crowdsecurity/traefik
+      - COLLECTIONS=crowdsecurity/traefik crowdsecurity/home-assistant Dominic-Wagner/vaultwarden
       - BOUNCER_KEY_traefik=${CROWDSEC_BOUNCER_KEY}
     volumes:
-      - ./config/crowdsec-acquis.yaml:/etc/crowdsec/acquis.d/traefik.yaml:ro
+      - ./config/crowdsec-acquis.yaml:/etc/crowdsec/acquis.d/homelab.yaml:ro
       - ./config/crowdsec-whitelist.yaml:/etc/crowdsec/parsers/s02-enrich/homelab-whitelist.yaml:ro
       - ${APPDATA}/traefik/logs:/var/log/traefik:ro
       - ${APPDATA}/crowdsec/data:/var/lib/crowdsec/data
@@ -67,6 +67,7 @@ services:
       start_period: 60s
     networks:
       - default
+      - crowdsec-socket   # reads app container logs through crowdsec-socket-proxy
 
   # Read-only Docker API for Traefik, so Traefik never holds the Docker socket itself
   socket-proxy:
@@ -88,9 +89,32 @@ services:
     networks:
       - socket
 
+  # CrowdSec's own read-only Docker API: container logs too, which Traefik's proxy doesn't allow
+  crowdsec-socket-proxy:
+    image: lscr.io/linuxserver/socket-proxy:3.4.7-r0-ls103
+    container_name: traefik_crowdsec_socket_proxy
+    restart: unless-stopped
+    environment:
+      - CONTAINERS=1
+      - ALLOW_LOGS=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    read_only: true
+    tmpfs:
+      - /run
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2375/_ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - crowdsec-socket
+
 networks:
   # Apps join this network (as external) to be reachable by Traefik
   proxy:
     name: proxy
   socket:
+    internal: true
+  crowdsec-socket:
     internal: true

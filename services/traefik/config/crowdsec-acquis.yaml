@@ -3,3 +3,19 @@ filenames:
   - /var/log/traefik/access.log
 labels:
   type: traefik
+---
+# Login failures of public apps with their own login, read from their container logs through
+# crowdsec-socket-proxy (read-only, logs allowed). A ban applies on the public entrypoint (crowdsec middleware).
+source: docker
+docker_host: tcp://crowdsec-socket-proxy:2375
+container_name:
+  - vaultwarden
+labels:
+  type: vaultwarden
+---
+source: docker
+docker_host: tcp://crowdsec-socket-proxy:2375
+container_name:
+  - homeassistant
+labels:
+  type: home-assistant
