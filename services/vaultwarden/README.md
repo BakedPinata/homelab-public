@@ -16,6 +16,6 @@ Labelled `homelab.backup.sqlite`, so `scripts/backup-db.sh` dumps it nightly to 
 2. Load the dump into a new file:
    ```bash
    gunzip < /srv/backups/db/vaultwarden/latest.sql.gz \
-     | docker run --rm -i --user 0 -v /srv/appdata/vaultwarden:/data keinos/sqlite3:3.53.4 sqlite3 /data/db.sqlite3
+     | docker run --rm -i --user 0 -v /srv/appdata/vaultwarden:/data keinos/sqlite3:3.54.1 sqlite3 /data/db.sqlite3
    ```
 3. `docker compose start vaultwarden` and log in.

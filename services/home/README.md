@@ -43,7 +43,7 @@ The editor has no login unless `adminAuth` is set in `/srv/appdata/home/nodered/
 - Integrations take a bare hostname, not a URL: AdGuard is host `adguard.<domain>`, port 443, SSL and verify SSL on. Keep its *Filtering* switch entity disabled (`services/adguard/README.md`, Pausing ad blocking).
 - Long-lived tokens (Profile → Security) are used by Node-RED (its Home Assistant server node) and `rest_command_auth` in `secrets.yaml` (`Bearer <token>`). Revoking one breaks both until they get the new one.
 - Restore history: stop `homeassistant`, move `home-assistant_v2.db*` aside, then
-  `gunzip < /srv/backups/db/homeassistant/latest.sql.gz | docker run --rm -i --user 0 -v /srv/appdata/home/homeassistant:/config keinos/sqlite3:3.53.4 sqlite3 /config/home-assistant_v2.db`
+  `gunzip < /srv/backups/db/homeassistant/latest.sql.gz | docker run --rm -i --user 0 -v /srv/appdata/home/homeassistant:/config keinos/sqlite3:3.54.1 sqlite3 /config/home-assistant_v2.db`
 
 ## Data
 `/srv/appdata/home/<app>`: `homeassistant` (config, `.storage`, history), `mosquitto` (`config/` users, `data/` retained messages), `zigbee2mqtt`, `matter`, `esphome` (device YAML), `nodered` (flows; `flows_cred.json` is encrypted with the key in `.config.runtime.json`, so keep them together).

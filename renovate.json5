@@ -18,6 +18,13 @@
       datasourceTemplate: 'docker',
     },
     {
+      // Restore commands in service READMEs use the same image as backup-db.sh
+      customType: 'regex',
+      managerFilePatterns: ['/^services/.+/README\\.md$/'],
+      matchStrings: ['(?<depName>keinos/sqlite3):(?<currentValue>[\\d.]+)'],
+      datasourceTemplate: 'docker',
+    },
+    {
       customType: 'regex',
       managerFilePatterns: ['/^\\.github/workflows/.+\\.ya?ml$/'],
       matchStrings: ['pipx install (?<depName>yamllint)==(?<currentValue>[\\d.]+)'],
