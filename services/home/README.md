@@ -28,7 +28,7 @@ docker exec mosquitto kill -HUP 1   # reload users
 - Pair mains-powered devices (plugs, repeater, bulbs) first: they are routers and extend the mesh. Battery devices: press a button now and then until the interview finishes.
 
 ## Matter
-Pairing data (fabric) is in `/srv/appdata/home/matter`, owned by uid 1000. Add a device in the Home Assistant phone app: **Settings → Devices → Add device → Matter**. Delete a dead device in Home Assistant before re-pairing it, so the new one gets the old entity IDs. A device paired to a lost fabric needs a factory reset first. For a device also in another app (Google Home, eWeLink), that app's "Share / Link apps & services" gives a pairing code instead.
+Pairing data (fabric) is in `/srv/appdata/home/matter`, owned by uid 1000. Add a device in the Home Assistant phone app: **Settings → Devices → Add device → Matter**. Delete a dead device in Home Assistant before re-pairing it, so the new one gets the old entity IDs. Re-pairing keeps the entity IDs but gives the device a new registry ID: automations built with UI *device* triggers or actions store that ID and get disabled, so build them on entities instead. A device paired to a lost fabric needs a factory reset first. For a device also in another app (Google Home, eWeLink), that app's "Share / Link apps & services" gives a pairing code instead.
 
 ## Node-RED
 The editor has no login unless `adminAuth` is set in `/srv/appdata/home/nodered/settings.js`:

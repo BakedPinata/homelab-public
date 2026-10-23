@@ -40,6 +40,7 @@ Jobs live in Duplicati's own settings, not in git. Create them in the UI with th
     3. The dump has the data: `zcat /srv/backups/db/<container>/latest.sql.gz | grep -c 'CREATE TABLE'` is above 0. The quarterly restore test proves it fully.
   - Neither holds (real data, no dump): don't exclude. Give the service a dump first (labels above), then exclude.
 - Keep advanced option `hardlink-policy` at `All` (the default): `latest.sql.gz` is a hardlink, and other policies skip it.
+- Dropping a source: remove it from the job (**Source data**) before removing its mount from `compose.yaml` and redeploying, or the job fails on the missing folder.
 - Photos are not in `nas-full`: they already live on the NAS, protected by NAS snapshots.
 - Encryption: AES-256 with a passphrase per job. Set once when the job is created; Duplicati stores it, so nightly runs need nothing.
 
