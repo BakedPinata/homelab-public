@@ -1,0 +1,10 @@
+# yamllint settings for scripts/validate.sh (R4).
+extends: default
+rules:
+  document-start: disable
+  line-length: disable           # Traefik router rules are long
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  truthy:
+    check-keys: false            # GitHub workflows use `on:`

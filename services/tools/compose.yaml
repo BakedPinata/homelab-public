@@ -1,0 +1,67 @@
+# Small browser tools. Public behind the Authentik gate, open on the LAN. Neither keeps any data.
+services:
+  plantuml:
+    image: plantuml/plantuml-server:jetty-v1.2026.9
+    container_name: plantuml
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - PLANTUML_LIMIT_SIZE=10000   # max image width/height in px (default 4096), as on the old server
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges
+    cap_drop:
+      - ALL
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.plantuml.rule=Host(`uml.${DOMAIN}`)
+      - traefik.http.routers.plantuml.entrypoints=internal
+      # Public behind Authentik, browser only (owner's user). The VS Code extension
+      # can't pass a gate, so it works on the LAN and Tailscale, which skip it.
+      - traefik.http.routers.plantuml-public.rule=Host(`uml.${DOMAIN}`)
+      - traefik.http.routers.plantuml-public.entrypoints=public
+      - traefik.http.routers.plantuml-public.middlewares=public-chain@file,authentik@file
+      - traefik.http.routers.plantuml-outpost.rule=Host(`uml.${DOMAIN}`) && PathPrefix(`/outpost.goauthentik.io/`)
+      - traefik.http.routers.plantuml-outpost.entrypoints=public
+      - traefik.http.routers.plantuml-outpost.middlewares=public-chain@file
+      - traefik.http.routers.plantuml-outpost.service=authentik@docker
+      - traefik.http.services.plantuml.loadbalancer.server.port=8080
+    networks:
+      - proxy
+
+  it-tools:
+    image: corentinth/it-tools:2024.10.22-7ca5933
+    container_name: it-tools
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    security_opt:
+      - no-new-privileges
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.it-tools.rule=Host(`ittools.${DOMAIN}`)
+      - traefik.http.routers.it-tools.entrypoints=internal
+      # Public behind Authentik, browser only (owner's user). The LAN and Tailscale skip the gate.
+      - traefik.http.routers.it-tools-public.rule=Host(`ittools.${DOMAIN}`)
+      - traefik.http.routers.it-tools-public.entrypoints=public
+      - traefik.http.routers.it-tools-public.middlewares=public-chain@file,authentik@file
+      - traefik.http.routers.it-tools-outpost.rule=Host(`ittools.${DOMAIN}`) && PathPrefix(`/outpost.goauthentik.io/`)
+      - traefik.http.routers.it-tools-outpost.entrypoints=public
+      - traefik.http.routers.it-tools-outpost.middlewares=public-chain@file
+      - traefik.http.routers.it-tools-outpost.service=authentik@docker
+      - traefik.http.services.it-tools.loadbalancer.server.port=80
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

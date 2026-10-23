@@ -1,0 +1,79 @@
+# Pieces every invitation flow uses: the sign-up form and the sign-in at the end.
+# Group files (invitation-<group>.yaml) apply this first. Edits made in the UI to these
+# objects are overwritten.
+version: 1
+metadata:
+  name: Homelab - Invitation shared
+entries:
+  - model: authentik_stages_prompt.prompt
+    id: field-username
+    identifiers:
+      name: invitation-field-username
+    attrs:
+      field_key: username
+      label: Username
+      type: username
+      required: true
+      placeholder: Username
+      order: 0
+  - model: authentik_stages_prompt.prompt
+    id: field-name
+    identifiers:
+      name: invitation-field-name
+    attrs:
+      field_key: name
+      label: Name
+      type: text
+      required: true
+      placeholder: Name
+      order: 1
+  - model: authentik_stages_prompt.prompt
+    id: field-email
+    identifiers:
+      name: invitation-field-email
+    attrs:
+      field_key: email
+      label: Email
+      type: email
+      required: true
+      placeholder: Email
+      order: 2
+  - model: authentik_stages_prompt.prompt
+    id: field-password
+    identifiers:
+      name: invitation-field-password
+    attrs:
+      field_key: password
+      label: Password
+      type: password
+      required: true
+      placeholder: Password
+      order: 3
+  - model: authentik_stages_prompt.prompt
+    id: field-password-repeat
+    identifiers:
+      name: invitation-field-password-repeat
+    attrs:
+      field_key: password_repeat
+      label: Password (repeat)
+      type: password
+      required: true
+      placeholder: Password (repeat)
+      order: 4
+
+  - model: authentik_stages_prompt.promptstage
+    identifiers:
+      name: invitation-prompt
+    attrs:
+      fields:
+        - !KeyOf field-username
+        - !KeyOf field-name
+        - !KeyOf field-email
+        - !KeyOf field-password
+        - !KeyOf field-password-repeat
+      validation_policies:
+        - !Find [authentik_policies_password.passwordpolicy, [name, default-password-change-password-policy]]
+
+  - model: authentik_stages_user_login.userloginstage
+    identifiers:
+      name: invitation-user-login

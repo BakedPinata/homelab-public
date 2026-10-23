@@ -1,0 +1,44 @@
+# Vaultwarden: Bitwarden-compatible password manager. SQLite in its data folder.
+services:
+  vaultwarden:
+    image: vaultwarden/server:1.37.4
+    container_name: vaultwarden
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - DOMAIN=https://warden.${DOMAIN}
+      - SIGNUPS_ALLOWED=false
+      - INVITATIONS_ALLOWED=true
+      - SIGNUPS_VERIFY=false
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=465
+      - SMTP_SECURITY=force_tls
+      - SMTP_FROM=${VAULTWARDEN_SMTP_EMAIL}
+      - SMTP_USERNAME=${VAULTWARDEN_SMTP_EMAIL}
+      - SMTP_PASSWORD=${VAULTWARDEN_SMTP_PASSWORD}
+    volumes:
+      - ${APPDATA}/vaultwarden:/data
+    healthcheck:
+      test: ["CMD", "/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - homelab.backup.db=true
+      - homelab.backup.sqlite=/data/db.sqlite3
+      - traefik.enable=true
+      - traefik.http.routers.vaultwarden.rule=Host(`warden.${DOMAIN}`)
+      - traefik.http.routers.vaultwarden.entrypoints=internal
+      # Public: own login + 2FA. The admin page stays internal.
+      - traefik.http.routers.vaultwarden-public.rule=Host(`warden.${DOMAIN}`) && !PathPrefix(`/admin`)
+      - traefik.http.routers.vaultwarden-public.entrypoints=public
+      - traefik.http.routers.vaultwarden-public.middlewares=public-chain@file
+      - traefik.http.services.vaultwarden.loadbalancer.server.port=80
+    networks:
+      - default   # email needs internet
+      - proxy
+
+networks:
+  proxy:
+    external: true

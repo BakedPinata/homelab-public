@@ -1,0 +1,82 @@
+# Obsidian in the browser, plus CouchDB for Self-hosted LiveSync (the phone app syncs through it).
+services:
+  obsidian:
+    image: lscr.io/linuxserver/obsidian:1.14.4
+    container_name: obsidian
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ${APPDATA}/obsidian/config:/config   # the vault, Obsidian settings, LiveSync plugin settings
+    shm_size: 1gb   # Electron needs more than Docker's 64 MB
+    depends_on:
+      obsidian_couchdb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.obsidian.rule=Host(`obsidian.${DOMAIN}`)
+      - traefik.http.routers.obsidian.entrypoints=internal
+      # Public behind Authentik (browser-only app)
+      - traefik.http.routers.obsidian-public.rule=Host(`obsidian.${DOMAIN}`)
+      - traefik.http.routers.obsidian-public.entrypoints=public
+      - traefik.http.routers.obsidian-public.middlewares=public-chain@file,authentik@file
+      - traefik.http.routers.obsidian-outpost.rule=Host(`obsidian.${DOMAIN}`) && PathPrefix(`/outpost.goauthentik.io/`)
+      - traefik.http.routers.obsidian-outpost.entrypoints=public
+      - traefik.http.routers.obsidian-outpost.middlewares=public-chain@file
+      - traefik.http.routers.obsidian-outpost.service=authentik@docker
+      - traefik.http.services.obsidian.loadbalancer.server.port=3000
+    networks:
+      - default   # plugin downloads need internet
+      - proxy
+
+  obsidian_couchdb:
+    image: couchdb:3.5.3
+    container_name: obsidian_couchdb
+    restart: unless-stopped
+    # Not labelled homelab.backup.db: CouchDB has no dump tool, and its append-only files are
+    # safe to copy while it runs, so Duplicati backs them up as they are (README).
+    environment:
+      - TZ=${TZ}
+      # Admin, only created when local.d has none yet (changing it here later does nothing)
+      - COUCHDB_USER=${COUCHDB_USER}
+      - COUCHDB_PASSWORD=${COUCHDB_PASSWORD}
+      # The sync login; read only by the setup command in the README
+      - LIVESYNC_USER=${LIVESYNC_USER}
+      - LIVESYNC_PASSWORD=${LIVESYNC_PASSWORD}
+      # Default chain plus couchdb.ini. Mounted outside /opt/couchdb: the entrypoint chowns
+      # everything there and exits on a read-only file.
+      - COUCHDB_INI_FILES=/opt/couchdb/etc/default.ini /opt/couchdb/etc/default.d /etc/couchdb-livesync.ini /opt/couchdb/etc/local.ini /opt/couchdb/etc/local.d
+    volumes:
+      - ./couchdb.ini:/etc/couchdb-livesync.ini:ro
+      - ${APPDATA}/obsidian/couchdb/data:/opt/couchdb/data
+      - ${APPDATA}/obsidian/couchdb/etc:/opt/couchdb/etc/local.d   # docker.ini: admin hash, node uuid
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost:5984/_up"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.couchdb.rule=Host(`couchdb.${DOMAIN}`)
+      - traefik.http.routers.couchdb.entrypoints=internal
+      # Public: own login only (R9 exception, see README). The Fauxton admin UI stays internal.
+      - traefik.http.routers.couchdb-public.rule=Host(`couchdb.${DOMAIN}`) && !PathPrefix(`/_utils`)
+      - traefik.http.routers.couchdb-public.entrypoints=public
+      - traefik.http.routers.couchdb-public.middlewares=public-chain@file
+      - traefik.http.services.couchdb.loadbalancer.server.port=5984
+    networks:
+      - proxy
+
+networks:
+  # default: this stack's own network, with internet access
+  proxy:
+    external: true

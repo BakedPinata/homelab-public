@@ -1,0 +1,64 @@
+# Invitation sign-up for the `friends` group: the invited person picks a username and
+# password, joins the group and is signed in. Without an invitation link the flow stops.
+# New group: sed 's/friends/<group>/g' invitation-friends.yaml > invitation-<group>.yaml
+version: 1
+metadata:
+  name: Homelab - Invitation friends
+entries:
+  - model: authentik_blueprints.metaapplyblueprint
+    attrs:
+      identifiers:
+        name: Homelab - Invitation shared
+      required: true
+
+  - model: authentik_core.group
+    id: group
+    identifiers:
+      name: friends
+
+  - model: authentik_flows.flow
+    id: flow
+    identifiers:
+      slug: friends-enrollment
+    attrs:
+      name: Invitation (friends)
+      title: Set up your account
+      designation: enrollment
+      authentication: require_unauthenticated
+
+  - model: authentik_stages_invitation.invitationstage
+    id: invitation-stage
+    identifiers:
+      name: friends-invitation
+    attrs:
+      continue_flow_without_invitation: false
+
+  - model: authentik_stages_user_write.userwritestage
+    id: user-write-stage
+    identifiers:
+      name: friends-user-write
+    attrs:
+      user_creation_mode: always_create
+      user_type: internal
+      create_users_group: !KeyOf group
+
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf invitation-stage
+      order: 10
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !Find [authentik_stages_prompt.promptstage, [name, invitation-prompt]]
+      order: 20
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !KeyOf user-write-stage
+      order: 30
+  - model: authentik_flows.flowstagebinding
+    identifiers:
+      target: !KeyOf flow
+      stage: !Find [authentik_stages_user_login.userloginstage, [name, invitation-user-login]]
+      order: 100

@@ -1,0 +1,27 @@
+# Middlewares for the public entrypoint. Every public router uses public-chain@file.
+http:
+  middlewares:
+    public-chain:
+      chain:
+        middlewares: [crowdsec, rate-limit, security-headers]
+
+    crowdsec:
+      plugin:
+        crowdsec:
+          enabled: true
+          crowdsecMode: stream   # keeps a local copy of the ban list, refreshed every minute
+          crowdsecLapiScheme: http
+          crowdsecLapiHost: crowdsec:8080
+          crowdsecLapiKey: '{{ env "CROWDSEC_BOUNCER_KEY" }}'
+
+    rate-limit:
+      rateLimit:   # per client IP; generous enough for photo uploads
+        average: 50
+        burst: 200
+
+    security-headers:
+      headers:
+        stsSeconds: 31536000
+        contentTypeNosniff: true
+        customFrameOptionsValue: SAMEORIGIN
+        referrerPolicy: strict-origin-when-cross-origin

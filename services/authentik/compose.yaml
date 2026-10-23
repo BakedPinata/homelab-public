@@ -1,0 +1,79 @@
+# Authentik: login gate (forward auth) for apps without their own login, and SSO. Own Postgres.
+x-authentik: &authentik
+  image: ghcr.io/goauthentik/server:2026.8.5
+  restart: unless-stopped
+  shm_size: 512mb
+  environment:
+    - TZ=${TZ}
+    - AUTHENTIK_SECRET_KEY=${AUTHENTIK_SECRET_KEY}
+    - AUTHENTIK_POSTGRESQL__HOST=authentik_postgres
+    - AUTHENTIK_POSTGRESQL__NAME=${AUTHENTIK_PG_DB}
+    - AUTHENTIK_POSTGRESQL__USER=${AUTHENTIK_PG_USER}
+    - AUTHENTIK_POSTGRESQL__PASSWORD=${AUTHENTIK_PG_PASSWORD}
+    - AUTHENTIK_EMAIL__HOST=${AUTHENTIK_EMAIL_HOST}
+    - AUTHENTIK_EMAIL__PORT=${AUTHENTIK_EMAIL_PORT}
+    - AUTHENTIK_EMAIL__USERNAME=${AUTHENTIK_EMAIL_USERNAME}
+    - AUTHENTIK_EMAIL__PASSWORD=${AUTHENTIK_EMAIL_PASSWORD}
+    - AUTHENTIK_EMAIL__USE_TLS=true
+    - AUTHENTIK_EMAIL__FROM=${AUTHENTIK_EMAIL_USERNAME}
+  volumes:
+    - ${APPDATA}/authentik/data:/data   # uploads; must be owned by uid 1000
+    - ./blueprints:/blueprints/custom:ro   # flows kept in git, applied by the worker
+  depends_on:
+    authentik_postgres:
+      condition: service_healthy
+  # Healthcheck is built into the image (ak healthcheck)
+
+services:
+  authentik_server:
+    <<: *authentik
+    container_name: authentik_server
+    command: server
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.authentik.loadbalancer.server.port=9000
+      - traefik.http.routers.authentik.rule=Host(`auth.${DOMAIN}`)
+      - traefik.http.routers.authentik.entrypoints=internal
+      # Public sign-in for family; the admin UI stays internal
+      - traefik.http.routers.authentik-public.rule=Host(`auth.${DOMAIN}`) && !PathPrefix(`/if/admin`)
+      - traefik.http.routers.authentik-public.entrypoints=public
+      - traefik.http.routers.authentik-public.middlewares=public-chain@file
+      - traefik.http.routers.authentik-public.service=authentik
+    networks:
+      - proxy
+      - backend
+
+  # Background tasks (email, outpost config). No Docker socket: only the embedded outpost is used.
+  authentik_worker:
+    <<: *authentik
+    container_name: authentik_worker
+    command: worker
+    networks:
+      - backend
+      - default   # email needs internet
+
+  authentik_postgres:
+    image: postgres:16.15-alpine
+    container_name: authentik_postgres
+    restart: unless-stopped
+    labels:
+      - homelab.backup.db=true   # nightly dump by scripts/backup-db.sh
+    environment:
+      - POSTGRES_DB=${AUTHENTIK_PG_DB}
+      - POSTGRES_USER=${AUTHENTIK_PG_USER}
+      - POSTGRES_PASSWORD=${AUTHENTIK_PG_PASSWORD}
+    volumes:
+      - ${APPDATA}/authentik/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+networks:
+  proxy:
+    external: true
+  backend:
+    internal: true

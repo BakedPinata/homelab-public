@@ -1,0 +1,137 @@
+# Home automation: MQTT broker, Zigbee, Matter, Home Assistant, ESPHome, Node-RED.
+# Home Assistant, Matter and ESPHome use the host network (device discovery), so their
+# routes are in services/traefik/config/dynamic/devices.yaml, not labels.
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.1.2-alpine
+    container_name: mosquitto
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - ${APPDATA}/home/mosquitto/config:/mosquitto/config   # mosquitto.passwd (users)
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ${APPDATA}/home/mosquitto/data:/mosquitto/data
+    ports:
+      - 1883:1883   # LAN devices (Tasmota) and Home Assistant
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "1883"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - default
+
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt:2.14.2
+    container_name: zigbee2mqtt
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      # Settings come from these variables (written into configuration.yaml); no setup page
+      - Z2M_ONBOARD_NO_SERVER=1
+      - ZIGBEE2MQTT_CONFIG_SERIAL_PORT=/dev/zigbee
+      - ZIGBEE2MQTT_CONFIG_SERIAL_ADAPTER=zstack   # Sonoff Dongle Plus (ZBDongle-P)
+      - ZIGBEE2MQTT_CONFIG_MQTT_SERVER=mqtt://mosquitto:1883
+      - ZIGBEE2MQTT_CONFIG_MQTT_USER=${Z2M_MQTT_USER}
+      - ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD=${Z2M_MQTT_PASSWORD}
+      - ZIGBEE2MQTT_CONFIG_HOMEASSISTANT_ENABLED=true
+      - ZIGBEE2MQTT_CONFIG_FRONTEND_ENABLED=true
+      - ZIGBEE2MQTT_CONFIG_FRONTEND_PORT=8080
+      - ZIGBEE2MQTT_CONFIG_FRONTEND_AUTH_TOKEN=${Z2M_FRONTEND_TOKEN}
+    volumes:
+      - ${APPDATA}/home/zigbee2mqtt:/app/data   # network key and coordinator backup: keep safe
+      - /run/udev:/run/udev:ro
+    devices:
+      - ${ZIGBEE_DONGLE}:/dev/zigbee
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.zigbee.rule=Host(`zigbee.${DOMAIN}`)
+      - traefik.http.routers.zigbee.entrypoints=internal
+      - traefik.http.services.zigbee.loadbalancer.server.port=8080
+    networks:
+      - default
+      - proxy
+
+  matter-server:
+    image: ghcr.io/matter-js/matterjs-server:1.5.2
+    container_name: matter-server
+    restart: unless-stopped
+    network_mode: host   # Matter needs mDNS and IPv6 on the LAN
+    environment:
+      - TZ=${TZ}
+      - LISTEN_ADDRESS=127.0.0.1   # only Home Assistant (same host) talks to it; no auth of its own. One address only
+    volumes:
+      - ${APPDATA}/home/matter:/data   # fabric credentials: lost = re-pair every Matter device
+    # Healthcheck is built into the image
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:2026.10.2
+    container_name: homeassistant
+    restart: unless-stopped
+    stop_grace_period: 2m   # time to close the recorder DB (Docker's 10 s default cut it off)
+    network_mode: host   # discovery (Cast, HomeKit, DLNA, Matter), Wake-on-LAN
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - ${APPDATA}/home/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+    labels:
+      - homelab.backup.db=true   # nightly dump by scripts/backup-db.sh
+      - homelab.backup.sqlite=/config/home-assistant_v2.db   # recorder history
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      matter-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8123/manifest.json"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
+  esphome:
+    image: ghcr.io/esphome/esphome:2026.10.0
+    container_name: esphome
+    restart: unless-stopped
+    network_mode: host   # finds devices by mDNS, updates them over Wi-Fi
+    environment:
+      - TZ=${TZ}
+      - USERNAME=${ESPHOME_USERNAME}
+      - PASSWORD=${ESPHOME_PASSWORD}
+    volumes:
+      - ${APPDATA}/home/esphome:/config
+    # Healthcheck is built into the image
+
+  nodered:
+    image: nodered/node-red:5.0.9
+    container_name: nodered
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - ${APPDATA}/home/nodered:/data   # owned by uid 1000
+    # Healthcheck is built into the image
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.node.rule=Host(`node.${DOMAIN}`)
+      - traefik.http.routers.node.entrypoints=internal
+      - traefik.http.services.node.loadbalancer.server.port=1880
+    networks:
+      - default   # reaches Home Assistant at the server's LAN IP
+      - proxy
+
+networks:
+  # default: this stack's own network, with internet access
+  proxy:
+    external: true

@@ -1,0 +1,46 @@
+# Duplicati: encrypted, versioned backups of this server to the NAS (offsite target still to be chosen).
+services:
+  duplicati:
+    image: lscr.io/linuxserver/duplicati:v2.4.0.1_stable_2026-10-07-ls314
+    container_name: duplicati
+    restart: unless-stopped
+    environment:
+      # Runs as root so it can read root-owned data (Home Assistant config). Every source is read-only.
+      - PUID=0
+      - PGID=0
+      - TZ=${TZ}
+      - SETTINGS_ENCRYPTION_KEY=${DUPLICATI_SETTINGS_ENCRYPTION_KEY}
+      - DUPLICATI__WEBSERVICE_PASSWORD=${DUPLICATI_UI_PASSWORD}
+    volumes:
+      - ${APPDATA}/duplicati:/config
+      # Sources
+      - ${APPDATA}:/source/appdata:ro
+      - /srv/backups:/source/backups:ro
+      - ../../services:/source/services:ro              # the .env files
+      # Destination: NAS BACKUPS share. Won't start if the folder is missing (share not mounted),
+      # instead of Docker silently creating it on the local disk.
+      - type: bind
+        source: ${NAS_BACKUP_PATH}
+        target: /backups
+        bind:
+          create_host_path: false
+    ports:
+      - 8200:8200
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.duplicati.rule=Host(`duplicati.${DOMAIN}`)
+      - traefik.http.routers.duplicati.entrypoints=internal
+      - traefik.http.services.duplicati.loadbalancer.server.port=8200
+    networks:
+      - default
+      - proxy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost:8200/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+networks:
+  proxy:
+    external: true

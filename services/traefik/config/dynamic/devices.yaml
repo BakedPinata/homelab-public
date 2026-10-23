@@ -1,0 +1,87 @@
+# Routes to things Traefik can't see through Docker labels: other devices, and apps on
+# this server's host network (services/home), reached at the server's LAN IP.
+# Reloaded automatically when this file changes. Hosts use DOMAIN from the Traefik .env.
+http:
+  routers:
+    nas:
+      rule: Host(`nas.{{ env "DOMAIN" }}`)
+      entryPoints: [internal]
+      service: nas
+    portainer:
+      rule: Host(`portainer.{{ env "DOMAIN" }}`)
+      entryPoints: [internal]
+      service: portainer
+    plex:
+      rule: Host(`plex.{{ env "DOMAIN" }}`)
+      entryPoints: [internal]
+      service: plex
+    speed:
+      rule: Host(`speed.{{ env "DOMAIN" }}`)
+      entryPoints: [internal]
+      service: speed
+    # Public behind Authentik (no login of its own)
+    speed-public:
+      rule: Host(`speed.{{ env "DOMAIN" }}`)
+      entryPoints: [public]
+      middlewares: [public-chain, authentik]
+      service: speed
+    speed-outpost:
+      rule: Host(`speed.{{ env "DOMAIN" }}`) && PathPrefix(`/outpost.goauthentik.io/`)
+      entryPoints: [public]
+      middlewares: [public-chain]
+      service: authentik@docker
+    jetkvm:
+      rule: Host(`jetkvm.{{ env "DOMAIN" }}`)
+      entryPoints: [internal]
+      service: jetkvm
+    octopi:
+      rule: Host(`octopi.{{ env "DOMAIN" }}`)
+      entryPoints: [internal]
+      service: octopi
+    hass:
+      rule: Host(`hass.{{ env "DOMAIN" }}`)
+      entryPoints: [internal]
+      service: hass
+    # Public, no gate (the phone apps can't pass one): own login, 2FA on every user
+    hass-public:
+      rule: Host(`hass.{{ env "DOMAIN" }}`)
+      entryPoints: [public]
+      middlewares: [public-chain]
+      service: hass
+    esphome:
+      rule: Host(`esphome.{{ env "DOMAIN" }}`)
+      entryPoints: [internal]
+      service: esphome
+
+  services:
+    nas:
+      loadBalancer:
+        servers: [{url: "https://192.168.10.7:5001"}]
+        serversTransport: self-signed
+    portainer:
+      loadBalancer:
+        servers: [{url: "http://192.168.10.7:9000"}]
+    plex:
+      loadBalancer:
+        servers: [{url: "http://192.168.10.7:32400"}]
+    speed:
+      loadBalancer:
+        servers: [{url: "http://192.168.10.7:3000"}]
+    jetkvm:
+      loadBalancer:
+        servers: [{url: "http://192.168.10.171"}]
+    octopi:
+      loadBalancer:
+        servers: [{url: "https://192.168.10.101"}]
+        serversTransport: self-signed
+    hass:
+      loadBalancer:
+        servers: [{url: "http://192.168.10.103:8123"}]
+    esphome:
+      loadBalancer:
+        servers: [{url: "http://192.168.10.103:6052"}]
+
+  serversTransports:
+    # DSM and OctoPrint use their own self-signed certificates
+    self-signed:
+      insecureSkipVerify: true

@@ -1,0 +1,70 @@
+# Grimmory ebook library with its own MariaDB.
+services:
+  grimmory:
+    image: grimmory/grimmory:v3.5.0
+    container_name: grimmory
+    restart: unless-stopped
+    environment:
+      - USER_ID=${PUID}
+      - GROUP_ID=${PGID}
+      - TZ=${TZ}
+      - DATABASE_URL=jdbc:mariadb://grimmory_mariadb:3306/${GRIMMORY_MARIADB_DATABASE}
+      - DATABASE_USERNAME=${GRIMMORY_MARIADB_USER}
+      - DATABASE_PASSWORD=${GRIMMORY_MARIADB_PASSWORD}
+      # OIDC calls only: auth.<domain> is a LAN IP here, which the SSRF filter blocks otherwise
+      - OIDC_ALLOW_UNSAFE_HOSTS=true
+    volumes:
+      - ${APPDATA}/grimmory/app:/app/data
+      - ${GRIMMORY_BOOKS_PATH}:/books
+      - ${GRIMMORY_BOOKDROP_PATH}:/bookdrop
+    ports:
+      - ${GRIMMORY_PORT}:6060
+    depends_on:
+      grimmory_mariadb:
+        condition: service_healthy
+    # Healthcheck is built into the image
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.grimmory.rule=Host(`grimmory.${DOMAIN}`)
+      - traefik.http.routers.grimmory.entrypoints=internal
+      # Public, no gate: OIDC-only mode sends users to Authentik (see README); e-reader paths check device credentials
+      - traefik.http.routers.grimmory-public.rule=Host(`grimmory.${DOMAIN}`)
+      - traefik.http.routers.grimmory-public.entrypoints=public
+      - traefik.http.routers.grimmory-public.middlewares=public-chain@file
+      - traefik.http.services.grimmory.loadbalancer.server.port=6060
+    networks:
+      - default
+      - backend
+      - proxy
+
+  grimmory_mariadb:
+    image: lscr.io/linuxserver/mariadb:11.8.9-r0-ls237
+    container_name: grimmory_mariadb
+    restart: unless-stopped
+    labels:
+      - homelab.backup.db=true   # nightly dump by scripts/backup-db.sh
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+      # Only applied when the database is first created
+      - MYSQL_ROOT_PASSWORD=${GRIMMORY_MARIADB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${GRIMMORY_MARIADB_DATABASE}
+      - MYSQL_USER=${GRIMMORY_MARIADB_USER}
+      - MYSQL_PASSWORD=${GRIMMORY_MARIADB_PASSWORD}
+    volumes:
+      - ${APPDATA}/grimmory/db:/config
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+networks:
+  # default: this stack's own network, with internet access
+  backend:
+    internal: true
+  proxy:
+    external: true

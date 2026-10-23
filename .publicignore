@@ -1,0 +1,6 @@
+# R1: tracked paths left out of the public repo (scripts/publish-public.sh). One path per line.
+project/
+CLAUDE.md
+.claude/
+.github/workflows/deploy.yaml
+.github/workflows/publish-public.yaml

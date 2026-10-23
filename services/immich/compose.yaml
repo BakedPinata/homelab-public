@@ -1,0 +1,90 @@
+# Immich photo library. Photos on the NAS share, database on local disk (R16).
+# Service names match Immich's own compose file, so its defaults apply and upgrades diff cleanly.
+x-immich-env: &immich-env
+  TZ: ${TZ}
+  DB_USERNAME: ${IMMICH_DB_USER}
+  DB_PASSWORD: ${IMMICH_DB_PASSWORD}
+  DB_DATABASE_NAME: ${IMMICH_DB_NAME}
+
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:v3.3.5
+    container_name: immich_server
+    restart: unless-stopped
+    environment: *immich-env
+    volumes:
+      - ${IMMICH_PHOTOS_PATH}:/data   # the database stores paths as /data/library/...
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+    # Healthcheck is built into the image
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.immich.rule=Host(`immich.${DOMAIN}`)
+      - traefik.http.routers.immich.entrypoints=internal
+      # Public, no gate (the phone apps can't pass one): sign-in is Authentik only, Password Login off (README)
+      - traefik.http.routers.immich-public.rule=Host(`immich.${DOMAIN}`)
+      - traefik.http.routers.immich-public.entrypoints=public
+      - traefik.http.routers.immich-public.middlewares=public-chain@file
+      - traefik.http.services.immich.loadbalancer.server.port=2283
+    networks:
+      - default   # internet: version check, map tiles, Authentik sign-in
+      - backend
+      - proxy
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:v3.3.5
+    container_name: immich_machine_learning
+    restart: unless-stopped
+    environment: *immich-env
+    volumes:
+      - ${APPDATA}/immich/model-cache:/cache   # downloaded models; rebuilt if lost
+    # Healthcheck is built into the image
+    networks:
+      - default   # downloads models on first use
+      - backend
+
+  redis:
+    image: docker.io/valkey/valkey:9.1.2
+    container_name: immich_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  database:
+    # Postgres 14 with the vector extensions Immich v3.3 expects
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    container_name: immich_postgres
+    restart: unless-stopped
+    shm_size: 128mb
+    labels:
+      - homelab.backup.db=true   # nightly dump by scripts/backup-db.sh
+    environment:
+      - POSTGRES_USER=${IMMICH_DB_USER}
+      - POSTGRES_PASSWORD=${IMMICH_DB_PASSWORD}
+      - POSTGRES_DB=${IMMICH_DB_NAME}
+      - POSTGRES_INITDB_ARGS=--data-checksums
+    volumes:
+      - ${APPDATA}/immich/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+networks:
+  # default: this stack's own network, with internet access
+  backend:
+    internal: true
+  proxy:
+    external: true

@@ -1,0 +1,8 @@
+# Secrets and generated output: never commit
+.env
+*.env
+out/
+*.pdf
+
+# Personal Claude Code overrides
+.claude/settings.local.json

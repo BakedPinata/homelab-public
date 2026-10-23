@@ -1,0 +1,56 @@
+# AdGuard Home: primary DNS for the LAN (ad blocking + split DNS for *.<domain>).
+services:
+  adguard:
+    image: adguard/adguardhome:v0.107.79
+    container_name: adguard
+    restart: unless-stopped
+    volumes:
+      - ${APPDATA}/adguard/conf:/opt/adguardhome/conf
+      - ${APPDATA}/adguard/work:/opt/adguardhome/work
+    ports:
+      # LAN IP only: systemd-resolved keeps 127.0.0.53 for the host itself
+      - ${LAN_IP}:53:53/tcp
+      - ${LAN_IP}:53:53/udp
+      # Rebuild only: add back for the setup wizard (3000) and the UI before the rewrite exists (3001)
+      # - ${LAN_IP}:3000:3000/tcp
+      # - ${LAN_IP}:3001:80/tcp
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.adguard.rule=Host(`adguard.${DOMAIN}`)
+      - traefik.http.routers.adguard.entrypoints=internal
+      - traefik.http.services.adguard.loadbalancer.server.port=80
+    healthcheck:
+      # Web UI is on 3000 until the setup wizard is done, then on 80
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:80/ || wget -q --spider http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - proxy
+      - default
+
+  # Copies settings (rewrites, filters, upstreams) to the NAS secondary every 10 minutes,
+  # and runs its setup wizard the first time. No healthcheck: the image has no shell or healthcheck command.
+  adguardhome-sync:
+    image: ghcr.io/bakito/adguardhome-sync:v0.9.4
+    container_name: adguardhome_sync
+    restart: unless-stopped
+    command: run
+    environment:
+      - ORIGIN_URL=http://adguard:80
+      - ORIGIN_USERNAME=${ADGUARD_USERNAME}
+      - ORIGIN_PASSWORD=${ADGUARD_PASSWORD}
+      - REPLICA1_URL=${ADGUARD_NAS_URL}
+      - REPLICA1_USERNAME=${ADGUARD_USERNAME}
+      - REPLICA1_PASSWORD=${ADGUARD_PASSWORD}
+      - REPLICA1_AUTO_SETUP=true
+      - CRON=*/10 * * * *
+      - RUN_ON_START=true
+      - API_PORT=0
+    depends_on:
+      adguard:
+        condition: service_healthy
+
+networks:
+  proxy:
+    external: true

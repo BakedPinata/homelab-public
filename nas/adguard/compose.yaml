@@ -1,0 +1,21 @@
+# AdGuard Home secondary DNS on the NAS. Deploy as a Portainer stack on the NAS environment.
+# Setup and settings come from the primary via adguardhome-sync (services/adguard): don't edit settings here.
+# Stack environment variable: NAS_DOCKER_PATH (the Docker share's path on the NAS, e.g. /volume1/docker)
+# Synology won't create missing bind folders: create adguard/conf and adguard/work in that share first.
+services:
+  adguard:
+    image: adguard/adguardhome:v0.107.79
+    container_name: adguard
+    restart: unless-stopped
+    volumes:
+      - ${NAS_DOCKER_PATH}/adguard/conf:/opt/adguardhome/conf
+      - ${NAS_DOCKER_PATH}/adguard/work:/opt/adguardhome/work
+    ports:
+      - 53:53/tcp
+      - 53:53/udp
+      - 3053:3000/tcp   # web UI and API (auto-setup keeps the UI on 3000); used by adguardhome-sync
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

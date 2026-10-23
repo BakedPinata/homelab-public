@@ -1,0 +1,20 @@
+# R4: checks every push and PR on GitHub-hosted runners. Same checks locally: scripts/validate.sh.
+name: validate
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0  # gitleaks scans the whole history
+      - name: Install yamllint
+        run: pipx install yamllint==1.38.0
+      - name: Compose config, .env.sample keys, image pins, yamllint
+        run: scripts/validate.sh
+      - name: gitleaks
+        run: docker run --rm -v "$PWD:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.30.1 git --redact --no-banner /repo

@@ -1,0 +1,32 @@
+# Tailscale: subnet router for the home LAN and exit node, for the owner's phone and laptop.
+services:
+  tailscale:
+    image: tailscale/tailscale:v1.104.2
+    container_name: tailscale
+    restart: unless-stopped
+    network_mode: host   # routes the LAN in the kernel (needs IP forwarding: bootstrap-host.sh)
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_AUTH_ONCE=true            # the key is only used for the first login
+      - TS_HOSTNAME=homelab
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_ROUTES=${LAN_SUBNET}
+      - TS_EXTRA_ARGS=--advertise-exit-node
+      - TS_ACCEPT_DNS=false          # the server keeps its own resolver
+      - TS_DEBUG_FIREWALL_MODE=nftables  # the host has no legacy iptables; without this, forwarding rules fail
+      - TS_ENABLE_HEALTH_CHECK=true
+      - TS_LOCAL_ADDR_PORT=127.0.0.1:9002
+    volumes:
+      - ${APPDATA}/tailscale:/var/lib/tailscale
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9002/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

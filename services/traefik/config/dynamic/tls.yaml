@@ -1,0 +1,6 @@
+# Applies to every TLS router
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true   # no certificate for unknown hostnames

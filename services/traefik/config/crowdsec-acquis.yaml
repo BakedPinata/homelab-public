@@ -1,0 +1,5 @@
+# CrowdSec: which logs to read
+filenames:
+  - /var/log/traefik/access.log
+labels:
+  type: traefik

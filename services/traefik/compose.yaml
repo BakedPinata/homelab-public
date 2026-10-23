@@ -1,0 +1,96 @@
+# Traefik reverse proxy. Routes come from Docker labels (via the socket proxy) and config/dynamic/.
+services:
+  traefik:
+    image: traefik:v3.7.16
+    container_name: traefik
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+      - CROWDSEC_BOUNCER_KEY=${CROWDSEC_BOUNCER_KEY}   # read by dynamic/public.yaml
+      - DOMAIN=${DOMAIN}   # read by dynamic/devices.yaml and the entrypoint below
+    # The static config can't read env vars, so fill in the domain before starting
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        [ -n "$$DOMAIN" ] || { echo "DOMAIN is not set in .env" >&2; exit 1; }
+        sed "s/__DOMAIN__/$$DOMAIN/g" /etc/traefik/traefik.yaml.tmpl > /tmp/traefik.yaml
+        exec traefik --configFile=/tmp/traefik.yaml
+    volumes:
+      - ./config/traefik.yaml:/etc/traefik/traefik.yaml.tmpl:ro
+      - ./config/dynamic:/etc/traefik/dynamic:ro
+      - ${APPDATA}/traefik:/data   # acme.json (certificates) and access logs
+    ports:
+      - 80:80     # redirects to 443
+      - 443:443   # internal: LAN and Tailscale only, never port-forwarded
+      - 8443:8443 # public: the UX7 forwards WAN 443 here
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dashboard.rule=Host(`traefik.${DOMAIN}`)
+      - traefik.http.routers.dashboard.entrypoints=internal
+      - traefik.http.routers.dashboard.service=api@internal
+    depends_on:
+      socket-proxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--configFile=/tmp/traefik.yaml"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      proxy:
+        gw_priority: 1   # route out via proxy, so Home Assistant sees Traefik from that subnet (trusted_proxies)
+      socket: {}
+      default: {}
+
+  # Reads Traefik's access log, bans attacking IPs; the crowdsec middleware asks it on every public request
+  crowdsec:
+    image: crowdsecurity/crowdsec:v1.8.1
+    container_name: crowdsec
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - COLLECTIONS=crowdsecurity/traefik
+      - BOUNCER_KEY_traefik=${CROWDSEC_BOUNCER_KEY}
+    volumes:
+      - ./config/crowdsec-acquis.yaml:/etc/crowdsec/acquis.d/traefik.yaml:ro
+      - ./config/crowdsec-whitelist.yaml:/etc/crowdsec/parsers/s02-enrich/homelab-whitelist.yaml:ro
+      - ${APPDATA}/traefik/logs:/var/log/traefik:ro
+      - ${APPDATA}/crowdsec/data:/var/lib/crowdsec/data
+      - ${APPDATA}/crowdsec/config:/etc/crowdsec
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - default
+
+  # Read-only Docker API for Traefik, so Traefik never holds the Docker socket itself
+  socket-proxy:
+    image: lscr.io/linuxserver/socket-proxy:3.4.7-r0-ls103
+    container_name: traefik_socket_proxy
+    restart: unless-stopped
+    environment:
+      - CONTAINERS=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    read_only: true
+    tmpfs:
+      - /run
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:2375/_ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - socket
+
+networks:
+  # Apps join this network (as external) to be reachable by Traefik
+  proxy:
+    name: proxy
+  socket:
+    internal: true

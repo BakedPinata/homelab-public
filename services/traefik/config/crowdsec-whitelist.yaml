@@ -1,0 +1,9 @@
+# CrowdSec: ignore requests on Authentik-gated public routers. Authentik runs first, so anything
+# reaching the app there comes from a signed-in user (Seerr's logout burst of 403s got one banned).
+# Add a router here when you gate a new app.
+name: homelab/gated-routers
+description: "Requests behind the Authentik gate"
+whitelist:
+  reason: "signed in through Authentik"
+  expression:
+    - evt.Meta.traefik_router_name in ['seerr-public@docker', 'speed-public@file', 'obsidian-public@docker', 'plantuml-public@docker', 'it-tools-public@docker']
