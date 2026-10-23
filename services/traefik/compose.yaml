@@ -53,6 +53,9 @@ services:
       - TZ=${TZ}
       - COLLECTIONS=crowdsecurity/traefik crowdsecurity/home-assistant Dominic-Wagner/vaultwarden
       - BOUNCER_KEY_traefik=${CROWDSEC_BOUNCER_KEY}
+    depends_on:
+      crowdsec-socket-proxy:   # CrowdSec exits at start if a Docker log source is unreachable
+        condition: service_healthy
     volumes:
       - ./config/crowdsec-acquis.yaml:/etc/crowdsec/acquis.d/homelab.yaml:ro
       - ./config/crowdsec-whitelist.yaml:/etc/crowdsec/parsers/s02-enrich/homelab-whitelist.yaml:ro
@@ -97,6 +100,7 @@ services:
     environment:
       - CONTAINERS=1
       - ALLOW_LOGS=1
+      - INFO=1   # CrowdSec's Docker source calls /info first and won't start without it
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     read_only: true
