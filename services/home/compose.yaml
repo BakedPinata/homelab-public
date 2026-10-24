@@ -75,7 +75,7 @@ services:
     # Healthcheck is built into the image
 
   homeassistant:
-    image: ghcr.io/home-assistant/home-assistant:2026.10.2
+    image: ghcr.io/home-assistant/home-assistant:2026.10.3
     container_name: homeassistant
     restart: unless-stopped
     stop_grace_period: 2m   # time to close the recorder DB (Docker's 10 s default cut it off)
