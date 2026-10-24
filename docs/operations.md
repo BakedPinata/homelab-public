@@ -1,7 +1,6 @@
 # Operations
 
-## LAN
-Three VLANs on the UX7: main `192.168.10.0/24` (ID 10: server, NAS), IoT `192.168.30.0/24` (ID 30: Tapo, Cast; Home Assistant reaches them) and NoT `192.168.40.0/24` (ID 40: Tasmota; the server can't reach in, the devices connect out to Mosquitto on `192.168.10.103:1883`). Docker networks must stay off these ranges: `/etc/docker/daemon.json` pins them to `172.16.0.0/12` (`scripts/bootstrap-host.sh`).
+LAN, addresses, ports and NAS shares: `docs/network.md`.
 
 ## How the internet gets in
 - **Cloudflare:** one DNS-only (grey cloud) wildcard record, `*.<domain>` → the static WAN IP. No per-host records: they would override the wildcard.

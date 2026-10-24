@@ -47,3 +47,14 @@ Emailed resets ("Forgot password?", **Email recovery link**) need a recovery flo
 - Database: `authentik_postgres`, dumped nightly by `scripts/backup-db.sh`.
 - `/srv/appdata/authentik/data`: uploads. Must be owned by uid 1000 (the container user).
 - Never change `AUTHENTIK_SECRET_KEY` after the first start: it signs sessions and encrypts stored secrets.
+
+## Restore the database
+Restores into an empty database, on the Authentik version the dump was made with.
+1. Stop the stack and move `/srv/appdata/authentik/db` aside, so Postgres starts empty.
+2. Start only the database: `docker compose up -d --wait authentik_postgres`
+3. Load the dump:
+   ```bash
+   gunzip --stdout /srv/backups/db/authentik_postgres/latest.sql.gz \
+     | docker exec -i authentik_postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+   ```
+4. `docker compose up -d --wait`, then sign in. `AUTHENTIK_SECRET_KEY` must be the one from before, or stored secrets can't be read.

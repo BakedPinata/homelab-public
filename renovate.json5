@@ -13,7 +13,7 @@
       managerFilePatterns: ['/^\\.github/workflows/.+\\.ya?ml$/', '/^scripts/.+\\.sh$/'],
       matchStrings: [
         '(?<depName>ghcr\\.io/gitleaks/gitleaks):(?<currentValue>v[\\d.]+)',
-        'SQLITE_IMAGE=(?<depName>[\\w./-]+):(?<currentValue>[\\d.]+)',
+        '[A-Z]+_IMAGE=(?<depName>[\\w./-]+):(?<currentValue>[\\w.-]+)',
       ],
       datasourceTemplate: 'docker',
     },
@@ -74,7 +74,7 @@
       minimumReleaseAge: '3 days',
     },
     {
-      matchDepNames: ['ghcr.io/gitleaks/gitleaks', 'keinos/sqlite3', 'yamllint'],
+      matchDepNames: ['ghcr.io/gitleaks/gitleaks', 'keinos/sqlite3', 'yamllint', 'pandoc/latex', 'minlag/mermaid-cli'],
       automerge: true,
       minimumReleaseAge: '3 days',
     },
