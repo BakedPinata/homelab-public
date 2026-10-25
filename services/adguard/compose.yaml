@@ -32,7 +32,7 @@ services:
   # Copies settings (rewrites, filters, upstreams) to the NAS secondary every 10 minutes,
   # and runs its setup wizard the first time. No healthcheck: the image has no shell or healthcheck command.
   adguardhome-sync:
-    image: ghcr.io/bakito/adguardhome-sync:v0.9.4
+    image: ghcr.io/bakito/adguardhome-sync:v0.9.5
     container_name: adguardhome_sync
     restart: unless-stopped
     command: run
