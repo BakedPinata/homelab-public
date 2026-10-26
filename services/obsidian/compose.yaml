@@ -1,7 +1,7 @@
 # Obsidian in the browser, plus CouchDB for Self-hosted LiveSync (the phone app syncs through it).
 services:
   obsidian:
-    image: lscr.io/linuxserver/obsidian:1.14.4
+    image: lscr.io/linuxserver/obsidian:1.14.5
     container_name: obsidian
     restart: unless-stopped
     environment:
