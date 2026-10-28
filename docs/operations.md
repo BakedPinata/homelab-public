@@ -51,7 +51,7 @@ The runner runs as your user, which is in the `docker` group, so it can do anyth
 ## Updates
 Renovate (GitHub App, private repo only) checks every pinned version and opens a PR per update; merging it deploys. Rules are in `renovate.json5`; the **Dependency Dashboard** issue lists everything pending.
 - **Setup (once, or after a rebuild):** install the app from `github.com/apps/renovate` on the private repo only. In the Mend portal (`developer.mend.io`): Dependency Updates not Silent, **Automated PRs** on, **Require config file** on, **Create onboarding PRs** off.
-- **Merge themselves** once a release is 3 days old and validate passes: CI tooling, the tools and media stacks (minor/patch), and the weekly linuxserver.io rebuilds (same app version, new `-lsNNN`, one grouped PR).
+- **Merge themselves** once a release is 3 days old and validate passes: CI tooling, the tools and media stacks (minor/patch), and the weekly linuxserver.io rebuilds (same app version, new `-lsNNN`, one grouped PR; lscr.io has no release dates, so these merge as soon as validate passes).
 - **Everything else** waits for you: read the release notes linked in the PR, then merge. Merge one stack at a time so a failure points at one change.
 - **Database majors** (Postgres, MariaDB, CouchDB, Valkey) only get a PR once you tick them on the **Dependency Dashboard** issue: they need a dump and restore, not a pull. Closing such a PR skips that major until the next one. Immich's database image is never updated by Renovate: follow Immich's release notes.
 - **A failed update** rolls back and emails you, and the version stays bumped in `main`. Revert the PR's commit (or fix forward), and Renovate won't offer that version again until a newer one comes out.
