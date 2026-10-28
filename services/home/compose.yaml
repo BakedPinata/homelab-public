@@ -101,7 +101,7 @@ services:
       start_period: 120s
 
   esphome:
-    image: ghcr.io/esphome/esphome:2026.10.0
+    image: ghcr.io/esphome/esphome:2026.10.1
     container_name: esphome
     restart: unless-stopped
     network_mode: host   # finds devices by mDNS, updates them over Wi-Fi
