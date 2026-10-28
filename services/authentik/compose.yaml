@@ -53,7 +53,7 @@ services:
       - default   # email needs internet
 
   authentik_postgres:
-    image: postgres:16.15-alpine
+    image: postgres:18.6-alpine
     container_name: authentik_postgres
     restart: unless-stopped
     labels:
@@ -63,7 +63,7 @@ services:
       - POSTGRES_USER=${AUTHENTIK_PG_USER}
       - POSTGRES_PASSWORD=${AUTHENTIK_PG_PASSWORD}
     volumes:
-      - ${APPDATA}/authentik/db:/var/lib/postgresql/data
+      - ${APPDATA}/authentik/db:/var/lib/postgresql   # Postgres 18+ keeps data in <major>/docker under this
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
       interval: 10s

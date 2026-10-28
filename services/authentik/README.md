@@ -44,7 +44,7 @@ Gates apply to public routes only; the LAN goes straight in. Which apps are gate
 Emailed resets ("Forgot password?", **Email recovery link**) need a recovery flow, which isn't set up yet: run the blueprint `Example - Recovery with email verification` (**Customization → Blueprints**), then set it as **Recovery flow** under **System → Brands → authentik-default**.
 
 ## Data
-- Database: `authentik_postgres`, dumped nightly by `scripts/backup-db.sh`.
+- Database: `authentik_postgres` (Postgres 18 since 2026-10-28), dumped nightly by `scripts/backup-db.sh`. Its files are in `/srv/appdata/authentik/db/18/docker`: from Postgres 18 the image keeps them under `<major>/docker`, so the mount is the parent folder.
 - `/srv/appdata/authentik/data`: uploads. Must be owned by uid 1000 (the container user).
 - Never change `AUTHENTIK_SECRET_KEY` after the first start: it signs sessions and encrypts stored secrets.
 
@@ -58,3 +58,15 @@ Restores into an empty database, on the Authentik version the dump was made with
      | docker exec -i authentik_postgres sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
    ```
 4. `docker compose up -d --wait`, then sign in. `AUTHENTIK_SECRET_KEY` must be the one from before, or stored secrets can't be read.
+
+## Postgres major upgrade
+A new major can't read the old data files, so a tag bump alone fails: Renovate's database-major PR is only the reminder. Do it by hand, with the stack's changes uncommitted until it works (deploys refuse meanwhile). Done this way for 16 → 18 on 2026-10-28, about 1.5 minutes of Authentik downtime.
+1. Read the release notes of Authentik (supported Postgres versions) and of the Postgres image (data path changes). Pull the new image first.
+2. `docker compose stop authentik_server authentik_worker`, so nothing writes from here.
+3. Count every table's rows into a file (query `information_schema.tables`, one `count(*)` each) for the comparison in step 6.
+4. `scripts/backup-db.sh authentik_postgres`, then copy `latest.sql.gz` to `pre-pg<new>-<date>.sql.gz` in the same folder (the 14-day cleanup only deletes `authentik_postgres-*`).
+5. `docker compose stop authentik_postgres`, rename `db` to `db-pg<old>` (same folder; it's the rollback), change the image and mount in `compose.yaml`, then start only the database and load the dump as in [Restore the database](#restore-the-database).
+6. Count again and compare: they must match exactly. Then `docker compose up -d --wait`, check the logs (expect "No migrations to apply") and sign in, from the LAN and from outside.
+7. Commit, push (the deploy finds nothing to change). Remove `db-pg<old>` and the `pre-pg` dump only once the owner is happy. `db-pg<old>` belongs to the Postgres user, so remove it through a container: `docker run --rm -v /srv/appdata/authentik:/a postgres:<new>-alpine rm -rf /a/db-pg<old>`.
+
+**Rollback** (any time before `db-pg<old>` is removed; changes made in Authentik since the switch are lost): `docker compose stop`, rename `db` to `db-pg<new>-failed` and `db-pg<old>` back to `db`, `git checkout compose.yaml` (or revert the commit), `docker compose up -d --wait`.
