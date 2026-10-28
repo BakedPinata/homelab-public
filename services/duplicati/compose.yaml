@@ -1,7 +1,7 @@
 # Duplicati: encrypted, versioned backups of this server to the NAS (offsite target still to be chosen).
 services:
   duplicati:
-    image: lscr.io/linuxserver/duplicati:v2.4.0.1_stable_2026-10-07-ls314
+    image: lscr.io/linuxserver/duplicati:v2.4.0.1_stable_2026-10-07-ls315
     container_name: duplicati
     restart: unless-stopped
     environment:
