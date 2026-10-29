@@ -1,7 +1,7 @@
 # Lets the Portainer server on the NAS see this host's containers. Look, logs and restart only: changes go through git.
 services:
   portainer-agent:
-    image: portainer/agent:2.45.3
+    image: portainer/agent:3.0.0
     container_name: portainer_agent
     restart: unless-stopped
     # No healthcheck: the image has no shell or curl
