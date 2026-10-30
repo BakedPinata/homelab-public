@@ -46,7 +46,7 @@ services:
 
   # Reads Traefik's access log and app login failures, bans attacking IPs; the crowdsec middleware asks it on every public request
   crowdsec:
-    image: crowdsecurity/crowdsec:v1.8.1
+    image: crowdsecurity/crowdsec:v1.8.2
     container_name: crowdsec
     restart: unless-stopped
     environment:
