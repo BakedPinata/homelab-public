@@ -61,7 +61,7 @@ services:
       - proxy
 
   radarr:
-    image: lscr.io/linuxserver/radarr:6.4.4.10685-ls321
+    image: lscr.io/linuxserver/radarr:6.4.4.10685-ls324
     container_name: radarr
     restart: unless-stopped
     environment:
