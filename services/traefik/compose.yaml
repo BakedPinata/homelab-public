@@ -1,7 +1,7 @@
 # Traefik reverse proxy. Routes come from Docker labels (via the socket proxy) and config/dynamic/.
 services:
   traefik:
-    image: traefik:v3.7.16
+    image: traefik:v3.7.17
     container_name: traefik
     restart: unless-stopped
     environment:
