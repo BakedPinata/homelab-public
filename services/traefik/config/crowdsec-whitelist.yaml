@@ -6,4 +6,4 @@ description: "Requests behind the Authentik gate"
 whitelist:
   reason: "signed in through Authentik"
   expression:
-    - evt.Meta.traefik_router_name in ['seerr-public@docker', 'speed-public@file', 'obsidian-public@docker', 'plantuml-public@docker', 'it-tools-public@docker']
+    - evt.Meta.traefik_router_name in ['seerr-public@docker', 'speed-public@file', 'obsidian-public@docker', 'plantuml-public@docker', 'it-tools-public@docker', 'timetracker-public@docker']

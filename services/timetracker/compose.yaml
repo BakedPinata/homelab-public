@@ -1,0 +1,58 @@
+# Time tracker proof of concept: a static PWA built from the app's private repo at a pinned commit.
+# No data here: entries live on the phone and in the user's Google Sheet. Temporary: README says how to remove it.
+services:
+  timetracker:
+    build:
+      # Update: change the commit here and in the image tag (README)
+      context: ${TIMETRACKER_REPO}#a289aebcf4f5d4ee0c889d9b5b804d6bc0aa75bd:poc
+      secrets:
+        - GIT_AUTH_TOKEN   # BuildKit's name for a token that reads a private git context
+    image: timetracker-poc:a289aeb
+    pull_policy: build   # built here, never pulled (a pull would fail the deploy)
+    container_name: timetracker
+    restart: unless-stopped
+    environment:
+      - GOOGLE_CLIENT_ID=${TIMETRACKER_GOOGLE_CLIENT_ID}
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    security_opt:
+      - no-new-privileges
+    cap_drop:
+      - ALL
+    cap_add:   # what nginx needs to start as root and drop to its worker user
+      - CHOWN
+      - SETUID
+      - SETGID
+      - NET_BIND_SERVICE
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.timetracker.rule=Host(`timetracker.${DOMAIN}`)
+      - traefik.http.routers.timetracker.entrypoints=internal
+      # Public behind Authentik (the driver's phone is on mobile data). The LAN and Tailscale skip the gate.
+      - traefik.http.routers.timetracker-public.rule=Host(`timetracker.${DOMAIN}`)
+      - traefik.http.routers.timetracker-public.entrypoints=public
+      - traefik.http.routers.timetracker-public.middlewares=public-chain@file,authentik@file
+      - traefik.http.routers.timetracker-outpost.rule=Host(`timetracker.${DOMAIN}`) && PathPrefix(`/outpost.goauthentik.io/`)
+      - traefik.http.routers.timetracker-outpost.entrypoints=public
+      - traefik.http.routers.timetracker-outpost.middlewares=public-chain@file
+      - traefik.http.routers.timetracker-outpost.service=authentik@docker
+      # Browsers fetch the manifest and install icons without cookies, so the gate would break "Install app"
+      - traefik.http.routers.timetracker-install.rule=Host(`timetracker.${DOMAIN}`) && (Path(`/manifest.webmanifest`) || Path(`/icon-192.png`) || Path(`/icon-512.png`))
+      - traefik.http.routers.timetracker-install.entrypoints=public
+      - traefik.http.routers.timetracker-install.middlewares=public-chain@file
+      - traefik.http.routers.timetracker-install.service=timetracker
+      - traefik.http.services.timetracker.loadbalancer.server.port=80
+    networks:
+      - proxy
+
+secrets:
+  GIT_AUTH_TOKEN:
+    environment: TIMETRACKER_GIT_TOKEN
+
+networks:
+  proxy:
+    external: true

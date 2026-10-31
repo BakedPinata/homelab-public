@@ -8,6 +8,7 @@ Every web address, where it runs, and who reaches it. All addresses are `https:/
 | `books` | BookStack wiki | Server | Public | Owner, family, friends | Authentik sign-in (password login is the fallback, README) |
 | `grimmory` | Ebook library | Server | Public | Owner, family, friends | Authentik sign-in (OIDC-only mode; admins also `/login?local=true`); device credentials (e-reader sync) |
 | `immich` | Immich photos | Server | Public | Owner, family | Authentik sign-in (Password Login off; recovery in README) |
+| `timetracker` | Time tracker proof of concept (temporary) | Server | Public; manifest and icons ungated | Owner, driver | Authentik gate; the app's own PIN and Google sign-in |
 | `obsidian` | Obsidian notes (browser view) | Server | Public | Owner | Authentik gate (owner's user only); none on the LAN |
 | `couchdb` | Obsidian LiveSync server | Server | Public; `/_utils` internal | Owner | CouchDB login (no 2FA: R9 exception, `services/obsidian`) |
 | `hass` | Home Assistant | Server | Public | Owner, partner | App login + 2FA |
