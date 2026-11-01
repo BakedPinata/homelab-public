@@ -11,8 +11,10 @@ Private git hosting (your own small GitHub) at `https://git.<domain>`, with git 
    - **Optional Settings → Server and Third-Party Service Settings:** self-registration off and **Require sign-in to view pages** on are already set; leave them.
    - **Optional Settings → Administrator Account Settings:** pick a username (`admin` is reserved), email and password. Store them in Vaultwarden.
    - **Install Gitea.** You're signed in. It writes `app.ini`, including `SECRET_KEY` ([Data](#data-and-backups)).
+   - Then `docker exec gitea mkdir -p /var/lib/gitea/git/repositories`. Gitea only makes it with the first repo; until then every SSH command prints "Unable to access repository path" and the first push-to-create fails.
 5. **2FA** (optional while internal, required to go public): avatar → **Settings → Security → Two-Factor Authentication**. Store the scratch code in Vaultwarden.
 6. **Duplicati** (UI, `nas-full` filters): add **Excludes folder** `/source/appdata/gitea/db/` (live Postgres, dumped). See [services/duplicati](../duplicati/README.md#jobs).
+7. **Each computer** you'll use: git, then an SSH key or a token ([Using it](#once-per-computer)). Without a key in Gitea, SSH answers "Permission denied (publickey)".
 
 ## Using it
 Words you'll see: a **repository** (repo) is a project folder with its full history. Gitea keeps the main copy; you **clone** it to a computer, **commit** changes there (a saved snapshot with a message), **push** commits up to Gitea and **pull** other people's (or your other computer's) commits down. `origin` is git's name for the copy you cloned from. `main` is the default branch.
