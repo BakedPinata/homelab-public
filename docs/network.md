@@ -37,6 +37,7 @@ Published on `192.168.10.103`; everything else is only reachable through Traefik
 | 8200 | Duplicati (fallback when Traefik is down) |
 | 6789, 8989, 7878, 5055 | nzbget, Sonarr, Radarr, Seerr |
 | 9001 | Portainer agent (the NAS's Portainer connects in) |
+| 2222 | Gitea git over SSH (`services/gitea`) |
 
 ## NAS shares
 Mounted by `scripts/bootstrap-host.sh` (`/etc/fstab`, `_netdev,nofail`, credentials in `~/.smbcredentials`). Docker waits for the mounts but still starts without them.

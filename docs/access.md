@@ -16,6 +16,7 @@ Every web address, where it runs, and who reaches it. All addresses are `https:/
 | `speed` | OpenSpeedTest | NAS | Public | Family | Authentik gate |
 | `warden` | Vaultwarden | Server | Public; `/admin` internal | Owner, family | App login + 2FA |
 | `auth` | Authentik sign-in | Server | Public sign-in pages; admin UI internal | Owner, family, friends | Own account + TOTP (admin) |
+| `git` | Gitea (private git repos) | Server | Internal (SSH on port 2222 too) | Owner | App login (2FA optional while internal); git: SSH key or token |
 | `zigbee`, `node`, `esphome` | Zigbee2MQTT, Node-RED, ESPHome | Server | Internal | Owner | Token, app login, app login |
 | `uml`, `ittools` | PlantUML, IT-Tools | Server | Public | Owner | Authentik gate (owner's user only); none on the LAN (PlantUML's VS Code extension needs that) |
 | `nzbget`, `sonarr`, `radarr` | Media automation | Server | Internal | Owner | App login |

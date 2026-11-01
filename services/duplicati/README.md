@@ -16,6 +16,7 @@ Jobs live in Duplicati's own settings, not in git. Create them in the UI with th
   |---|---|---|
   | Excludes folder | `/source/appdata/authentik/db/` | live Postgres (dumped) |
   | Excludes folder | `/source/appdata/bookstack/db/` | live MariaDB (dumped) |
+  | Excludes folder | `/source/appdata/gitea/db/` | live Postgres (dumped) |
   | Excludes folder | `/source/appdata/grimmory/db/` | live MariaDB (dumped) |
   | Excludes folder | `/source/appdata/immich/db/` | live Postgres (dumped) |
   | Excludes folder | `/source/appdata/immich/model-cache/` | downloaded models, fetched again if lost |

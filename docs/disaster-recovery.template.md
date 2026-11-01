@@ -65,6 +65,7 @@ What stops first if nothing is done:
 | Ebooks (Grimmory) | NAS, `Downloads` share, `Grimmory` folder | Yes |
 | Passwords (Vaultwarden) | The server | No: Emergency Access, or each person exports their own |
 | Wiki (BookStack), notes (Obsidian), Home Assistant | The server, with encrypted backups on the NAS | No: needs the server, or a helper restoring the backup |
+| Private code (Gitea) | The server, with encrypted backups on the NAS; a full copy on each computer that cloned it | Yes, from those computers' copies; otherwise as above |
 
 To copy the photos:
 
@@ -177,7 +178,7 @@ Live database files are not in the backup: each database comes back from its nig
 Start each with `docker compose up -d --wait` in `~/homelab/services/<name>`:
 
 1. `traefik` first (it creates the `proxy` network), then `adguard`.
-2. Each stack with a database: start only the database, load `/srv/backups/db/<container>/latest.sql.gz` as its README's *Restore* section says, then start the stack: `authentik`, `vaultwarden`, `immich`, `bookstack`, `grimmory`, `home` (Home Assistant's history).
+2. Each stack with a database: start only the database, load `/srv/backups/db/<container>/latest.sql.gz` as its README's *Restore* section says, then start the stack: `authentik`, `vaultwarden`, `immich`, `bookstack`, `grimmory`, `gitea`, `home` (Home Assistant's history).
 3. The rest: `tailscale`, `tools`, `media`, `obsidian`, `portainer-agent`, `duplicati` (now with its restored `.env`).
 4. Duplicati: recreate the `nas-full` job from `services/duplicati/README.md`, with the same passphrase and destination.
 
