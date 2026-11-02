@@ -19,7 +19,7 @@ Gates apply to public routes only; the LAN goes straight in. Which apps are gate
 
 ## Users, groups and app access
 - **Group:** a set of users. Groups are what you grant apps to. A group needs no blueprint.
-- **Blueprint:** Authentik settings kept as YAML in `blueprints/` (in git). The worker applies a file as soon as it is created or saved, and re-checks every hour; edits made in the UI to those objects are overwritten. Here blueprints only hold the invitation sign-up flows. A sign-up flow puts new users into one fixed group, so each group you want to *invite* people into has its own small file (`invitation-<group>.yaml`); the form they share is in `invitation-shared.yaml`.
+- **Blueprint:** Authentik settings kept as YAML in `blueprints/` (in git). The worker applies a file as soon as it is created or saved, and re-checks every hour; edits made in the UI to those objects are overwritten. Here blueprints only hold the invitation sign-up flows (one per group, plus `noaccess-enrollment` with no group) and their sign-up email. A sign-up flow puts new users into one fixed group, so each group you want to *invite* people into has its own small file (`invitation-<group>.yaml`); the form they share is in `invitation-shared.yaml`.
 
 **Add a group** (example `coworkers`):
 1. With invitations: `sed 's/family/coworkers/g' blueprints/invitation-family.yaml > blueprints/invitation-coworkers.yaml`, then commit. The server's checkout is mounted into Authentik, so it applies straight away (no redeploy): **Customization → Blueprints** shows it as successful, and a `coworkers` group and `coworkers-enrollment` flow appear.
@@ -27,13 +27,13 @@ Gates apply to public routes only; the LAN goes straight in. Which apps are gate
 3. Give the group its apps (below). A new group can reach nothing until then. Add it to the Users column in [docs/access.md](../../docs/access.md).
 
 **Add a user:**
-- Invite (preferred): **Directory → Invitations → Create**: flow `<group>-enrollment`, **Single use** on, an expiry a few days out. Expand the invitation's row to copy the link and send it. They choose a username and password, join the group and are signed in.
+- Invite (preferred): **Directory → Invitations → Create**: flow `<group>-enrollment`, **Single use** on, an expiry a few days out. Expand the invitation's row to copy the link and send it. For someone who should get specific apps only, use flow `noaccess-enrollment` (`invitation-noaccess.yaml`): it adds them to no group, so they reach nothing until you bind them to apps or add them to a group. Changing an invitation's flow later changes its link (the link holds the flow's slug, and the old link stops working), so send the new one. They choose a username and password, join the group and are signed in. When the account is created, the `authentik Admins` group (`akadmin` and any other admin) gets an email and a bell notification (rule `invitation-notify-signup` in `invitation-shared.yaml`; the email shows the raw event, with the username, name and email).
 - By hand: **Directory → Users → Create**, add them to a group, then on the user's page **Set password** (creating a user never asks for one).
 - Another group for an existing user: the group's page → **Users → Add existing user**.
 - Users change their own password under user menu → **Settings**.
 
 **Give or remove app access:** **Applications → Applications → `<app>` → Policy / Group / User Bindings → Bind existing policy / group / user → Group**. Anyone in any bound group gets in. To remove access, delete the binding; to shut out one person, take them out of the group or **Deactivate** them on their page.
-- **An application with no bindings lets every signed-in user in.** Always bind at least one group (today all of them bind `family`).
+- **An application with no bindings lets every signed-in user in.** Always bind at least one group or user (today every app does).
 - Authentik decides only for gated apps and apps signed in through Authentik (BookStack, Grimmory, Immich). Apps with their own login (Vaultwarden, Plex for Seerr) also need an account in that app. LAN visitors skip the gate.
 - Admin rights: keep **Superuser** (on a group's settings) to `akadmin`. Limited admin rights, such as only creating invitations, are roles (**Directory → Roles**); none are set up.
 

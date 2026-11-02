@@ -1,4 +1,5 @@
-# Pieces every invitation flow uses: the sign-up form and the sign-in at the end.
+# Pieces every invitation flow uses: the sign-up form, the sign-in at the end and the
+# email to the admins when someone signs up.
 # Group files (invitation-<group>.yaml) apply this first. Edits made in the UI to these
 # objects are overwritten.
 version: 1
@@ -77,3 +78,29 @@ entries:
   - model: authentik_stages_user_login.userloginstage
     identifiers:
       name: invitation-user-login
+
+  # Email (and bell notification) to the admins when an invitation sign-up creates an account.
+  # The user-write stage logs a user_write event with created=true once the user is saved.
+  - model: authentik_policies_expression.expressionpolicy
+    id: match-invitation-signup
+    identifiers:
+      name: invitation-match-signup
+    attrs:
+      expression: |
+        event = request.context.get("event")
+        return bool(event) and event.action == "user_write" and event.context.get("created", False)
+  - model: authentik_events.notificationrule
+    id: notify-invitation-signup
+    identifiers:
+      name: invitation-notify-signup
+    attrs:
+      severity: notice
+      destination_group: !Find [authentik_core.group, [name, authentik Admins]]
+      transports:
+        - !Find [authentik_events.notificationtransport, [name, default-email-transport]]
+        - !Find [authentik_events.notificationtransport, [name, default-local-transport]]
+  - model: authentik_policies.policybinding
+    identifiers:
+      order: 0
+      policy: !KeyOf match-invitation-signup
+      target: !KeyOf notify-invitation-signup
