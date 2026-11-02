@@ -13,7 +13,7 @@ Private git hosting (your own small GitHub) at `https://git.<domain>`, with git 
    - **Install Gitea.** You're signed in. It writes `app.ini`, including `SECRET_KEY` ([Data](#data-and-backups)).
    - Then `docker exec gitea mkdir -p /var/lib/gitea/git/repositories`. Gitea only makes it with the first repo; until then every SSH command prints "Unable to access repository path" and the first push-to-create fails.
 5. **2FA** (optional while internal, required to go public): avatar → **Settings → Security → Two-Factor Authentication**. Store the scratch code in Vaultwarden.
-6. **Duplicati** (UI, `nas-full` filters): add **Excludes folder** `/source/appdata/gitea/db/` (live Postgres, dumped). See [services/duplicati](../duplicati/README.md#jobs).
+6. **Duplicati** (UI, `nas-full` filters): add **Excludes folder** for `/source/appdata/gitea/db/` (live Postgres, dumped), `/source/appdata/gitea/app/indexers/` and `/source/appdata/gitea/app/queues/` (locked while Gitea runs, rebuilt if missing). See [services/duplicati](../duplicati/README.md#jobs).
 7. **Each computer** you'll use: git, then an SSH key or a token ([Using it](#once-per-computer)). Without a key in Gitea, SSH answers "Permission denied (publickey)".
 
 ## Using it
@@ -92,7 +92,7 @@ Sign-up is off. Avatar → **Site Administration → Identity & Access → User 
 Leave SSH home: from the internet it needs its own UX7 forward (WAN 2222 → `192.168.10.103:2222`) that goes straight to Gitea, past Traefik and CrowdSec. HTTPS with a token does the same job. Single sign-on through Authentik (like BookStack) is possible later: an OAuth2 provider in Authentik, then Gitea's **Site Administration → Identity & Access → Authentication Sources**.
 
 ## Data and backups
-- `/srv/appdata/gitea/app`: repositories (`git/repositories/<user>/<repo>.git`, plain bare git repos), attachments, LFS files, the SSH host key. Owned by uid 1000. Backed up by Duplicati `nas-full`.
+- `/srv/appdata/gitea/app`: repositories (`git/repositories/<user>/<repo>.git`, plain bare git repos), attachments, LFS files, the SSH host key. Owned by uid 1000. Backed up by Duplicati `nas-full`, except `indexers/` (search index, rebuilt from the database at start) and `queues/` (pending background tasks).
 - `/srv/appdata/gitea/config/app.ini`: settings, including `SECRET_KEY` (encrypts 2FA secrets). Restore it with the rest; never generate a new one. Settings in `compose.yaml` overwrite their lines at every start.
 - `/srv/appdata/gitea/db`: live Postgres, excluded from Duplicati. Dumped nightly to `/srv/backups/db/gitea_postgres/` ([Backups](../../README.md#backups)). Dump now: `scripts/backup-db.sh gitea_postgres`.
 - Every clone on a computer is a full copy of its repo's history: `git push` to an empty Gitea repo brings it back.
