@@ -1,7 +1,7 @@
 # Gitea: private git hosting, with its own Postgres. Rootless image: built-in SSH server, runs as uid 1000.
 services:
   gitea:
-    image: gitea/gitea:28.2.0-rootless
+    image: gitea/gitea:28.3.0-rootless
     container_name: gitea
     restart: unless-stopped
     environment:
