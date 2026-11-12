@@ -1,7 +1,7 @@
 # BookStack wiki with its own MariaDB.
 services:
   bookstack:
-    image: lscr.io/linuxserver/bookstack:v26.09.2-ls291
+    image: lscr.io/linuxserver/bookstack:v26.09.3-ls297
     container_name: bookstack
     restart: unless-stopped
     environment:
