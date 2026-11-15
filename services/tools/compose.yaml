@@ -1,7 +1,7 @@
 # Small browser tools. Public behind the Authentik gate, open on the LAN. Neither keeps any data.
 services:
   plantuml:
-    image: plantuml/plantuml-server:jetty-v1.2026.9
+    image: plantuml/plantuml-server:jetty-v1.2026.10
     container_name: plantuml
     restart: unless-stopped
     environment:
