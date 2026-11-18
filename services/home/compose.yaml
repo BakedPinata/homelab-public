@@ -3,7 +3,7 @@
 # routes are in services/traefik/config/dynamic/devices.yaml, not labels.
 services:
   mosquitto:
-    image: eclipse-mosquitto:2.1.2-alpine
+    image: eclipse-mosquitto:2.1.4-alpine
     container_name: mosquitto
     restart: unless-stopped
     environment:
