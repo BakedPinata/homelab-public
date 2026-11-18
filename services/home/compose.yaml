@@ -114,7 +114,7 @@ services:
     # Healthcheck is built into the image
 
   nodered:
-    image: nodered/node-red:5.0.9
+    image: nodered/node-red:5.0.10
     container_name: nodered
     restart: unless-stopped
     environment:
