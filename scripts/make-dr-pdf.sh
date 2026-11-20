@@ -7,7 +7,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PANDOC_IMAGE=pandoc/latex:3.11.0.0-debian
+PANDOC_IMAGE=pandoc/latex:3.14.0.0-debian
 MERMAID_IMAGE=minlag/mermaid-cli:12.0.1
 
 sample=0; [[ ${1:-} == --sample ]] && sample=1
