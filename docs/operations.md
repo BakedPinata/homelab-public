@@ -54,6 +54,7 @@ Renovate (GitHub App, private repo only) checks every pinned version and opens a
 - **Merge themselves** once a release is 3 days old and validate passes: CI tooling, the tools and media stacks (minor/patch), and the weekly linuxserver.io rebuilds (same app version, new `-lsNNN`, one grouped PR; lscr.io doesn't always give a release date, and a rebuild without one merges as soon as validate passes).
 - **Everything else** waits for you: read the release notes linked in the PR, then merge. Merge one stack at a time so a failure points at one change.
 - **Database majors** (Postgres, MariaDB, CouchDB, Valkey) only get a PR once you tick them on the **Dependency Dashboard** issue: they need a dump and restore, not a pull. Closing such a PR skips that major until the next one. Immich's database image is never updated by Renovate: follow Immich's release notes.
+- **Not Renovate:** the `timetracker` stack builds from the owner's own private repo, which would put the owner's name in a published file. That repo opens the update PR instead (`services/timetracker`).
 - **A failed update** rolls back and emails you, and the version stays bumped in `main`. Revert the PR's commit (or fix forward), and Renovate won't offer that version again until a newer one comes out.
 - The host OS updates itself (`unattended-upgrades`: security and regular updates, no automatic reboot).
 

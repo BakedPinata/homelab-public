@@ -3,7 +3,7 @@
 services:
   timetracker:
     build:
-      # Update: change the commit here and in the image tag (README)
+      # Commit and image tag are bumped by a PR from the app repo (README); by hand, change both
       context: ${TIMETRACKER_REPO}#a289aebcf4f5d4ee0c889d9b5b804d6bc0aa75bd:poc
       secrets:
         - GIT_AUTH_TOKEN   # BuildKit's name for a token that reads a private git context
