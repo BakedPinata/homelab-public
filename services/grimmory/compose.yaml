@@ -1,7 +1,7 @@
 # Grimmory ebook library with its own MariaDB.
 services:
   grimmory:
-    image: grimmory/grimmory:v3.5.0
+    image: grimmory/grimmory:v3.5.1
     container_name: grimmory
     restart: unless-stopped
     environment:
