@@ -4,10 +4,10 @@ services:
   timetracker:
     build:
       # Commit and image tag are bumped by a PR from the app repo (README); by hand, change both
-      context: ${TIMETRACKER_REPO}#a289aebcf4f5d4ee0c889d9b5b804d6bc0aa75bd:poc
+      context: ${TIMETRACKER_REPO}#b084a605d9bc12e01e56f4416b8a6274e114a267:poc
       secrets:
         - GIT_AUTH_TOKEN   # BuildKit's name for a token that reads a private git context
-    image: timetracker-poc:a289aeb
+    image: timetracker-poc:b084a60
     pull_policy: build   # built here, never pulled (a pull would fail the deploy)
     container_name: timetracker
     restart: unless-stopped
