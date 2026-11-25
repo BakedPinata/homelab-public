@@ -160,6 +160,77 @@ OnUnitActiveSec=5min
 [Install]
 WantedBy=timers.target
 EOF
+echo "== UPS: shut down cleanly on battery (NUT client of the NAS, docs/operations.md#ups)"
+# The UPS's USB cable is on the NAS, which shares it (DSM: Network UPS server; Synology's fixed
+# login monuser/secret, read-only, allowed IPs only). Shut down after 2 minutes on battery, on low
+# battery, or when the NAS enters Safe Mode (5 minutes, set in DSM) and sends FSD. Losing contact
+# (USB unplugged, NAS rebooting, network) never shuts down while the UPS was last on mains.
+apt-get install -y -qq nut-client
+sed -i 's/^MODE=.*/MODE=netclient/' /etc/nut/nut.conf
+grep -q '^MODE=' /etc/nut/nut.conf || echo 'MODE=netclient' >> /etc/nut/nut.conf
+cat > /etc/nut/upsmon.conf <<EOF
+# Written by scripts/bootstrap-host.sh
+MONITOR ups@${NAS#//} 1 monuser secret secondary
+MINSUPPLIES 1
+SHUTDOWNCMD "/sbin/shutdown -h +0"
+NOTIFYCMD /usr/sbin/upssched
+POLLFREQ 5
+POLLFREQALERT 5
+DEADTIME 15
+FINALDELAY 5
+NOTIFYFLAG ONLINE SYSLOG+EXEC
+NOTIFYFLAG ONBATT SYSLOG+EXEC
+NOTIFYFLAG LOWBATT SYSLOG+EXEC
+NOTIFYFLAG FSD SYSLOG+EXEC
+NOTIFYFLAG SHUTDOWN SYSLOG+EXEC
+NOTIFYFLAG COMMBAD SYSLOG
+NOTIFYFLAG COMMOK SYSLOG
+NOTIFYFLAG NOCOMM SYSLOG
+NOTIFYFLAG REPLBATT SYSLOG
+EOF
+chown root:nut /etc/nut/upsmon.conf; chmod 640 /etc/nut/upsmon.conf
+cat > /etc/nut/upssched.conf <<'EOF'
+# Written by scripts/bootstrap-host.sh
+CMDSCRIPT /usr/local/sbin/homelab-ups-event
+PIPEFN /run/nut/upssched.pipe
+LOCKFN /run/nut/upssched.lock
+AT ONBATT * START-TIMER onbatt-shutdown 120
+AT ONLINE * CANCEL-TIMER onbatt-shutdown
+AT ONBATT * EXECUTE onbatt
+AT ONLINE * EXECUTE online
+AT LOWBATT * EXECUTE lowbatt
+AT FSD * EXECUTE fsd
+AT SHUTDOWN * EXECUTE shutdown
+EOF
+# Runs as user nut. Events queue in the spool; scripts/watchdog.sh emails them (within 5 minutes,
+# or after the next boot if the internet was down).
+install -d -o nut -g "$(id -gn "$OWNER")" -m 2770 /var/spool/homelab-ups
+cat > /usr/local/sbin/homelab-ups-event <<'EOF'
+#!/bin/sh
+# Called by upssched with one event (/etc/nut/upssched.conf, from scripts/bootstrap-host.sh).
+umask 007
+case $1 in
+  onbatt) msg="On battery: mains lost. The server shuts down in 2 minutes unless it returns." ;;
+  online) msg="Back on mains." ;;
+  onbatt-shutdown) msg="On battery for 2 minutes: shutting the server down." ;;
+  lowbatt) msg="Battery low: shutting the server down." ;;
+  fsd) msg="The NAS is entering Safe Mode: shutting the server down." ;;
+  shutdown) msg="Server shutdown started." ;;
+  *) msg="Event: $1" ;;
+esac
+logger -t homelab-ups "$msg"
+printf '%s %s\n' "$(date '+%F %T')" "$msg" > "/var/spool/homelab-ups/$(date +%s%N).$1"
+[ "$1" = onbatt-shutdown ] && /usr/sbin/upsmon -c fsd
+exit 0
+EOF
+chmod 755 /usr/local/sbin/homelab-ups-event
+systemctl enable nut-monitor
+systemctl restart nut-monitor
+sleep 3
+upsc "ups@${NAS#//}" ups.status 2>/dev/null | grep -q . || echo "WARNING: can't read the UPS from the NAS (DSM: Network UPS server on, this host's IP allowed?)"
+# The timer's shutdown is a signal from user nut to upsmon: check that path with a harmless reload
+runuser -u nut -- /usr/sbin/upsmon -c reload || echo "WARNING: user nut can't signal upsmon, so the 2-minute shutdown won't work"
+
 systemctl daemon-reload
 systemctl enable --now homelab-backup-db.timer homelab-watchdog.timer
 

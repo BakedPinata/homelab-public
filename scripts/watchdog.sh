@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Email the owner when something stops working, and again when it's fixed.
 # Checks: NAS shares in /etc/fstab not mounted; containers not running, unhealthy or crash-looping;
-# Docker not responding; disks at 90% or more.
+# Docker not responding; disks at 90% or more; the UPS unreadable, its monitor down, or its battery
+# due. Also emails the UPS events that homelab-ups-event queues (on battery, back on mains, shutdown).
 # A problem is reported once it shows on two runs in a row and cleared after two clean runs,
 # so deploys and one-off restarts don't alert. If the email fails, the next run tries again.
 # One self-fix: Traefik without its plugins is restarted once the internet is back (and emailed).
@@ -13,6 +14,8 @@ cd "$(dirname "$0")/.."
 
 state=${XDG_STATE_HOME:-$HOME/.local/state}/homelab-watchdog
 mkdir -p "$state"; touch "$state/seen" "$state/reported" "$state/restarts"
+UPS=${UPS:-ups@192.168.10.7}
+spool=${UPS_SPOOL:-/var/spool/homelab-ups}   # UPS events queued by homelab-ups-event (bootstrap-host.sh)
 
 problems() {
   local d
@@ -39,6 +42,17 @@ problems() {
       echo "Traefik started without its plugins: public sites give 404 (docker restart traefik)"
     fi
   fi
+  # UPS (on the NAS's USB; this host is a NUT client, docs/operations.md#ups)
+  if command -v upsc >/dev/null; then
+    systemctl is-active --quiet nut-monitor || echo "UPS monitor (nut-monitor) not running: no clean shutdown on power loss"
+    local ups
+    if ! ups=$(upsc "$UPS" ups.status 2>/dev/null); then
+      echo "UPS not readable through the NAS (USB cable, NAS or network): no clean shutdown on power loss"
+    else
+      if [[ " $ups " == *" RB "* ]]; then echo "UPS says its battery needs replacing"; fi
+      if [[ " $ups " == *" OVER "* ]]; then echo "UPS overloaded"; fi
+    fi
+  fi
   df -P / /srv 2>/dev/null | awk 'NR > 1 && $5 + 0 >= 90 { print "Disk " $6 " is " $5 " full" }' | sort -u
 }
 
@@ -46,6 +60,17 @@ now=$(problems | sort -u)
 rm -f "$state/containers.new"
 if [[ ${1:-} == --dry-run ]]; then rm -f "$state/restarts.new"; echo "${now:-No problems}"; exit 0; fi
 if [[ -f $state/restarts.new ]]; then mv "$state/restarts.new" "$state/restarts"; fi
+
+# UPS events (on battery, back on mains, shutdown): one email for all queued, removed once sent
+events=()
+[[ -d $spool ]] && events=("$spool"/*.*)
+if [[ -e ${events[0]:-} ]]; then
+  last=$(cut -d' ' -f3- "${events[-1]}")
+  if { echo "UPS events, oldest first:"; echo; cat "${events[@]}" | sed 's/^/- /'; } |
+     ${NOTIFY:-scripts/notify.sh} -s "UPS: $last"; then
+    rm -f "${events[@]}"
+  fi
+fi
 
 # Self-fix: restart Traefik once the internet is back so it loads its plugins (at most every 30 min)
 actions=""
