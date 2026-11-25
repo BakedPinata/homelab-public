@@ -1,6 +1,7 @@
 # Secrets and generated output: never commit
 .env
 *.env
+git-token
 out/
 *.pdf
 

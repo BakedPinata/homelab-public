@@ -51,7 +51,9 @@ services:
 
 secrets:
   GIT_AUTH_TOKEN:
-    environment: TIMETRACKER_GIT_TOKEN
+    # The build's read token, in a file next to this one, never committed (README, Setup).
+    # Not in .env: Compose reads a secret's environment: source from the shell only, so deploys built with no token
+    file: ./git-token
 
 networks:
   proxy:

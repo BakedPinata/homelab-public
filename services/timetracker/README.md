@@ -9,7 +9,7 @@ A temporary test instance of a work-in-progress time tracker PWA, at `https://ti
 
 ## Setup (once)
 1. **GitHub token:** Settings → Developer settings → Fine-grained tokens → Generate. Repository access: only the app's repo. Permissions: **Contents: Read-only**. Pick an expiry that outlasts the test, and note the date: when it expires, builds fail but the running app doesn't.
-2. **`.env`:** copy `.env.sample` and fill it in: the repo's https URL, the token, and the Google Client ID.
+2. **`.env`:** copy `.env.sample` and fill it in: the repo's https URL and the Google Client ID. Put the token alone in `services/timetracker/git-token` (gitignored), then `chmod 600 git-token`. It can't go in `.env`: Compose takes a build secret's `environment:` value only from the shell, so deploys would build with no token.
 3. **Google client** (Google Auth Platform → Clients → the web client): add `https://timetracker.<domain>` to **Authorized JavaScript origins** and `https://timetracker.<domain>/` to **Authorized redirect URIs**. LAN and internet use the same name, so one origin covers both. Changes take up to five minutes.
 4. **Authentik:** follow [Put a sign-in page in front of an app](../authentik/README.md#put-a-sign-in-page-in-front-of-an-app) steps 1–2 (slug `timetracker`, external host `https://timetracker.<domain>`). In the provider's **Advanced protocol settings**, set **Token validity** to `days=30`: it's how long the gate session lasts (see [Gotchas](#gotchas)). Bind the owner's user, and the driver's once they have an Authentik account (invite them, [Users, groups and app access](../authentik/README.md#users-groups-and-app-access)). That page's steps 3–4 (Traefik routers, CrowdSec whitelist) are already done here.
 5. Commit and push. The deploy builds the image (about a minute the first time) and starts it. Test from outside as in [Test before going live](../../docs/operations.md#test-before-going-live): expect a 302 to `auth.<domain>` for `/`, and a 200 for `/manifest.webmanifest`.
@@ -32,7 +32,7 @@ Lives in the app repo, not here. If it's lost, recreate it: on a push (paths `po
   - Better, in the app repo: have the worker skip those paths (add `|| url.pathname.startsWith('/outpost.goauthentik.io/')` to the `fetch` handler's `return` condition in `service-worker.published.js`), and ship it while the session is still valid. After that, when updates stop, open `https://timetracker.<domain>/outpost.goauthentik.io/start?rd=https://timetracker.<domain>/` in Chrome to sign in again (untested: try it once after shipping the fix).
   - Never clear the site's data to fix it: that deletes rows that haven't synced.
 - **Build warning** "Compose is configured to build using Bake, but buildx isn't installed": harmless. Compose builds with the daemon's BuildKit.
-- **Build can't read the repo** ("repository does not contain ref", or an auth error): check the token hasn't expired and still covers the repo, and that `context` holds the full 40-character commit (BuildKit doesn't accept short ones).
+- **Build can't read the repo** ("repository does not contain ref", or an auth error): check `git-token` exists and holds just the token, that the token hasn't expired and still covers the repo, and that `context` holds the full 40-character commit (BuildKit doesn't accept short ones).
 - The app's Dockerfile uses unpinned base images (`dotnet/sdk:10.0`, `nginx:stable-alpine`), so a rebuild of the same commit can pick up newer ones. Renovate can't see them: they're in the app repo. Pin them there before this becomes more than a test.
 
 ## Remove it
@@ -41,7 +41,7 @@ Sync the phone first: rows that haven't synced exist only on the device. Then, i
 2. **Images and cache:** `docker image rm $(docker image ls -q timetracker-poc)`, then `docker builder prune`.
 3. **Repo:** delete `services/timetracker/`, its row in `docs/access.md`, and `'timetracker-public@docker'` in `services/traefik/config/crowdsec-whitelist.yaml`. Add a `project/LOG.md` entry, then commit and push (the deploy recreates CrowdSec for the whitelist and warns that the stack was removed, as expected).
 4. **Authentik:** Outposts → authentik Embedded Outpost → Edit: remove the application. Then delete the `timetracker` application and its provider. The driver's Authentik account stays unless they use nothing else: deactivate or delete it on their page.
-5. **GitHub:** delete both fine-grained tokens (the build's read token, and `HOMELAB_TOKEN`). In the app repo, delete `.github/workflows/bump-homelab.yaml` and the `HOMELAB_TOKEN` secret, and close any open `timetracker-bump` PR here.
+5. **GitHub:** delete `services/timetracker/git-token` if still there, and both fine-grained tokens (the build's read token, and `HOMELAB_TOKEN`). In the app repo, delete `.github/workflows/bump-homelab.yaml` and the `HOMELAB_TOKEN` secret, and close any open `timetracker-bump` PR here.
 6. **Google:** remove `https://timetracker.<domain>` from the client's origins and redirect URIs (or delete the Google project if the test is over).
 7. **Phone:** uninstall the app, then Chrome → Site settings → `timetracker.<domain>` → **Delete data**.
 
