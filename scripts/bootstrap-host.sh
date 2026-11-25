@@ -41,12 +41,31 @@ for s in "${SHARES[@]}"; do
   mountpoint -q "$dir" || echo "WARNING: $dir is not mounted (check the share name and .smbcredentials)"
 done
 
-echo "== Docker starts after the NAS mounts (but still starts if they fail)"
+echo "== Docker waits up to 5 minutes for the NAS mounts (but still starts if they fail)"
+# After a power cut the network can report online before the link is up (2026-11-25: 74 s early),
+# so the boot-time mounts fail and containers start on empty folders. Retry until mounted.
+cat > /usr/local/sbin/homelab-wait-for-nas <<'EOF'
+#!/bin/sh
+# Run before Docker starts (docker.service.d/wait-for-nas.conf, from scripts/bootstrap-host.sh).
+end=$(( $(date +%s) + 300 ))
+while :; do
+  missing=$(findmnt --fstab -t cifs -rn -o TARGET | while read -r d; do mountpoint -q "$d" || echo "$d"; done)
+  [ -z "$missing" ] && exit 0
+  [ "$(date +%s)" -ge "$end" ] && break
+  mount -a -t cifs 2>/dev/null
+  sleep 5
+done
+echo "NAS shares still not mounted, starting Docker anyway:" $missing >&2
+EOF
+chmod 755 /usr/local/sbin/homelab-wait-for-nas
 mkdir -p /etc/systemd/system/docker.service.d
 cat > /etc/systemd/system/docker.service.d/wait-for-nas.conf <<EOF
 [Unit]
 Wants=${units[*]}
 After=${units[*]}
+
+[Service]
+ExecStartPre=/usr/local/sbin/homelab-wait-for-nas
 EOF
 
 echo "== Docker networks stay in 172.16.0.0/12"
@@ -119,7 +138,29 @@ User=$OWNER
 SupplementaryGroups=systemd-journal
 ExecStart=$REPO/scripts/notify.sh %i
 EOF
+echo "== Watchdog emails (scripts/watchdog.sh, every 5 minutes)"
+cat > /etc/systemd/system/homelab-watchdog.service <<EOF
+[Unit]
+Description=Check NAS mounts, containers and disks; email on change
+OnFailure=homelab-notify@%n.service
+
+[Service]
+Type=oneshot
+User=$OWNER
+ExecStart=$REPO/scripts/watchdog.sh
+EOF
+cat > /etc/systemd/system/homelab-watchdog.timer <<EOF
+[Unit]
+Description=Homelab watchdog every 5 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+EOF
 systemctl daemon-reload
-systemctl enable --now homelab-backup-db.timer
+systemctl enable --now homelab-backup-db.timer homelab-watchdog.timer
 
 echo "Done. Log out and back in if you were just added to the docker group."

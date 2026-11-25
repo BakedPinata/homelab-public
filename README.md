@@ -47,8 +47,8 @@ Every app is reachable on the LAN and over Tailscale. Only the ones with a publi
 | `nas/<name>/` | Stacks that run on the NAS, deployed through Portainer |
 | `docs/access.md` | Every web address: where it runs, who reaches it, how they log in |
 | `docs/network.md` | VLANs, fixed addresses, server ports, NAS shares |
-| `docs/operations.md` | How the internet reaches Traefik; making an app public or internal; deploys and the runner; updates; the public repo |
-| `scripts/bootstrap-host.sh` | Prepares a fresh Ubuntu host (packages, folders, NAS mounts, Docker address pool) |
+| `docs/operations.md` | How the internet reaches Traefik; making an app public or internal; deploys and the runner; updates; alerts; the public repo |
+| `scripts/bootstrap-host.sh` | Prepares a fresh Ubuntu host (packages, folders, NAS mounts and the wait for them, Docker address pool, timers) |
 | `scripts/check-env.sh` | Checks every `.env` has the keys its `.env.sample` lists |
 | `scripts/deploy.sh` | Deploys the stacks changed since the last good deploy, rolls back if unhealthy. The `deploy` workflow runs it after `validate` ([docs/operations.md](docs/operations.md#deploys)) |
 | `.publicignore` | Files left out of the public copy of this repo. `scripts/publish-public.sh` builds the copy, `scripts/import-pr.sh` brings public PRs in ([docs/operations.md](docs/operations.md#public-repo)) |
@@ -56,7 +56,8 @@ Every app is reachable on the LAN and over Tailscale. Only the ones with a publi
 | `scripts/validate.sh` | Repo checks: compose files resolve from `.env.sample`, images pinned, yamllint. CI runs it with gitleaks on every push and PR (`.github/workflows/validate.yaml`) |
 | `docs/disaster-recovery.template.md` | The recovery pack: `scripts/make-dr-pdf.sh` fills it from every `.env` and `dr.env` (keys in `dr.env.sample`) and renders a PDF into `out/` |
 | `scripts/backup-db.sh` | Dumps every database container (nightly, or on demand) |
-| `scripts/notify.sh` | Emails the owner when the dump timer fails |
+| `scripts/notify.sh` | Emails the owner when a timer fails, or for the watchdog |
+| `scripts/watchdog.sh` | Every 5 minutes: emails when a NAS share, container or disk has a problem, and when it's fixed ([docs/operations.md](docs/operations.md#alerts)) |
 | `/srv/backups/db/<container>/` | Database dumps, kept 14 days. `latest.sql.gz` is the newest. |
 | `/srv/appdata/<name>/` | Container data on the server. Outside git, backed up. |
 | `/media/{Photos,Video,Downloads,docker,Backups}` | NAS shares |

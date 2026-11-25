@@ -64,7 +64,7 @@ Test:
 
 A run that never starts (container down) sends nothing; phase 7 monitoring covers that.
 
-The 02:00 dump timer emails through `scripts/notify.sh`, using the same keys. Test it with `scripts/notify.sh homelab-backup-db.service`.
+The 02:00 dump timer emails through `scripts/notify.sh`, using the same keys. Test it with `scripts/notify.sh homelab-backup-db.service`. The watchdog emails with the same keys ([docs/operations.md](../../docs/operations.md#alerts)).
 
 ## Passphrases: what to keep where
 | Secret | Needed for | Keep in |
