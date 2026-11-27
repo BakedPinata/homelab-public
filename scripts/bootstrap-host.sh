@@ -160,23 +160,64 @@ OnUnitActiveSec=5min
 [Install]
 WantedBy=timers.target
 EOF
-echo "== UPS: shut down cleanly on battery (NUT client of the NAS, docs/operations.md#ups)"
-# The UPS's USB cable is on the NAS, which shares it (DSM: Network UPS server; Synology's fixed
-# login monuser/secret, read-only, allowed IPs only). Shut down after 2 minutes on battery, on low
-# battery, or when the NAS enters Safe Mode (5 minutes, set in DSM) and sends FSD. Losing contact
-# (USB unplugged, NAS rebooting, network) never shuts down while the UPS was last on mains.
-apt-get install -y -qq nut-client
-sed -i 's/^MODE=.*/MODE=netclient/' /etc/nut/nut.conf
-grep -q '^MODE=' /etc/nut/nut.conf || echo 'MODE=netclient' >> /etc/nut/nut.conf
+echo "== UPS: NUT server for the EcoFlow RIVER 3 Plus (USB here), clean shutdown at 20% (docs/operations.md#ups)"
+# At 20% this host (primary) sets FSD: the NAS (DSM network UPS client of this host) enters Safe Mode,
+# logs off, and this host shuts down. The River can't switch its outlets off (no killpower in NUT's
+# EcoFlow driver), so nothing sees power return: this host sets an RTC alarm before shutting down,
+# wakes every 15 minutes and powers off again while still on battery (homelab-ups-gate). Once mains is
+# back it boots, reports OL, and the NAS leaves Safe Mode by rebooting itself (tested 2026-11-27).
+# Losing contact with the UPS never shuts anything down while it was last on mains.
+apt-get install -y -qq nut-server nut-client
+sed -i 's/^MODE=.*/MODE=netserver/' /etc/nut/nut.conf
+grep -q '^MODE=' /etc/nut/nut.conf || echo 'MODE=netserver' >> /etc/nut/nut.conf
+cat > /etc/udev/rules.d/62-homelab-ups.rules <<'EOF'
+# EcoFlow RIVER 3 Plus: let the NUT driver (user nut) open it
+SUBSYSTEM=="usb", ATTR{idVendor}=="3746", ATTR{idProduct}=="ffff", MODE="0664", GROUP="nut"
+EOF
+udevadm control --reload; udevadm trigger --subsystem-match=usb --attr-match=idVendor=3746
+cat > /etc/nut/ups.conf <<'EOF'
+# Written by scripts/bootstrap-host.sh
+maxretry = 3
+
+[ups]
+  driver = usbhid-ups
+  port = auto
+  vendorid = 3746
+  productid = ffff
+  desc = "EcoFlow RIVER 3 Plus"
+  # The River never raises low battery itself (NUT issue 3068): derive it from the charge
+  ignorelb
+  override.battery.charge.low = 20
+EOF
+cat > /etc/nut/upsd.conf <<'EOF'
+# Written by scripts/bootstrap-host.sh. LAN only: port 3493 isn't published to the internet.
+LISTEN 0.0.0.0 3493
+EOF
+# monuser/secret: the fixed login a Synology uses as a network UPS client (secondary, read-only).
+# The local monitor's own password is random, kept across re-runs.
+pw=$(sed -n 's/^MONITOR ups@localhost 1 upsmon-local \([^ ]*\) primary$/\1/p' /etc/nut/upsmon.conf 2>/dev/null)
+[[ -n $pw ]] || pw=$(head -c 18 /dev/urandom | base64 | tr -d '/+=')
+cat > /etc/nut/upsd.users <<EOF
+# Written by scripts/bootstrap-host.sh
+[monuser]
+  password = secret
+  upsmon secondary
+[upsmon-local]
+  password = $pw
+  upsmon primary
+EOF
 cat > /etc/nut/upsmon.conf <<EOF
 # Written by scripts/bootstrap-host.sh
-MONITOR ups@${NAS#//} 1 monuser secret secondary
+MONITOR ups@localhost 1 upsmon-local $pw primary
 MINSUPPLIES 1
-SHUTDOWNCMD "/sbin/shutdown -h +0"
+SHUTDOWNCMD "/usr/local/sbin/homelab-ups-poweroff"
 NOTIFYCMD /usr/sbin/upssched
+POWERDOWNFLAG /etc/killpower
 POLLFREQ 5
 POLLFREQALERT 5
 DEADTIME 15
+# Wait for the NAS to log off (it did ~60 s after FSD) before shutting down
+HOSTSYNC 120
 FINALDELAY 5
 NOTIFYFLAG ONLINE SYSLOG+EXEC
 NOTIFYFLAG ONBATT SYSLOG+EXEC
@@ -188,48 +229,93 @@ NOTIFYFLAG COMMOK SYSLOG
 NOTIFYFLAG NOCOMM SYSLOG
 NOTIFYFLAG REPLBATT SYSLOG
 EOF
-chown root:nut /etc/nut/upsmon.conf; chmod 640 /etc/nut/upsmon.conf
+chown root:nut /etc/nut/ups.conf /etc/nut/upsd.conf /etc/nut/upsd.users /etc/nut/upsmon.conf
+chmod 640 /etc/nut/upsd.users /etc/nut/upsmon.conf
 cat > /etc/nut/upssched.conf <<'EOF'
 # Written by scripts/bootstrap-host.sh
 CMDSCRIPT /usr/local/sbin/homelab-ups-event
 PIPEFN /run/nut/upssched.pipe
 LOCKFN /run/nut/upssched.lock
-AT ONBATT * START-TIMER onbatt-shutdown 120
-AT ONLINE * CANCEL-TIMER onbatt-shutdown
 AT ONBATT * EXECUTE onbatt
 AT ONLINE * EXECUTE online
 AT LOWBATT * EXECUTE lowbatt
 AT FSD * EXECUTE fsd
 AT SHUTDOWN * EXECUTE shutdown
 EOF
-# Runs as user nut. Events queue in the spool; scripts/watchdog.sh emails them (within 5 minutes,
-# or after the next boot if the internet was down).
+# Events queue in the spool; scripts/watchdog.sh emails them (within 5 minutes, or after the next
+# boot if the internet was down).
 install -d -o nut -g "$(id -gn "$OWNER")" -m 2770 /var/spool/homelab-ups
 cat > /usr/local/sbin/homelab-ups-event <<'EOF'
 #!/bin/sh
-# Called by upssched with one event (/etc/nut/upssched.conf, from scripts/bootstrap-host.sh).
+# Called by upssched (as user nut) or homelab-ups-gate with one event (scripts/bootstrap-host.sh).
 umask 007
 case $1 in
-  onbatt) msg="On battery: mains lost. The server shuts down in 2 minutes unless it returns." ;;
+  onbatt) msg="On battery: mains lost. Everything keeps running; it shuts down at 20% battery unless mains returns." ;;
   online) msg="Back on mains." ;;
-  onbatt-shutdown) msg="On battery for 2 minutes: shutting the server down." ;;
-  lowbatt) msg="Battery low: shutting the server down." ;;
-  fsd) msg="The NAS is entering Safe Mode: shutting the server down." ;;
-  shutdown) msg="Server shutdown started." ;;
+  lowbatt) msg="Battery at 20%: shutting down (the NAS enters Safe Mode, then this server powers off)." ;;
+  fsd) msg="Forced shutdown sent to the NAS." ;;
+  shutdown) msg="Server shutdown started. It wakes every 15 minutes to check for mains." ;;
+  boot-off) msg="Woke up still on battery: powering off again until the next check." ;;
   *) msg="Event: $1" ;;
 esac
 logger -t homelab-ups "$msg"
 printf '%s %s\n' "$(date '+%F %T')" "$msg" > "/var/spool/homelab-ups/$(date +%s%N).$1"
-[ "$1" = onbatt-shutdown ] && /usr/sbin/upsmon -c fsd
 exit 0
 EOF
-chmod 755 /usr/local/sbin/homelab-ups-event
-systemctl enable nut-monitor
-systemctl restart nut-monitor
-sleep 3
-upsc "ups@${NAS#//}" ups.status 2>/dev/null | grep -q . || echo "WARNING: can't read the UPS from the NAS (DSM: Network UPS server on, this host's IP allowed?)"
-# The timer's shutdown is a signal from user nut to upsmon: check that path with a harmless reload
-runuser -u nut -- /usr/sbin/upsmon -c reload || echo "WARNING: user nut can't signal upsmon, so the 2-minute shutdown won't work"
+cat > /usr/local/sbin/homelab-ups-poweroff <<'EOF'
+#!/bin/sh
+# upsmon's SHUTDOWNCMD: the River never cuts its outlets, so set an RTC wake-up first (homelab-ups-gate).
+/usr/sbin/rtcwake -m no -s 900 || logger -t homelab-ups "rtcwake failed: this server won't wake by itself"
+exec /sbin/shutdown -h +0
+EOF
+nas_mac=$(ping -c1 -W1 "${NAS#//}" >/dev/null 2>&1; ip neigh show "${NAS#//}" | awk '{print $5}')
+echo "NAS_MAC=$nas_mac" > /etc/default/homelab-ups
+cat > /usr/local/sbin/homelab-ups-gate <<'EOF'
+#!/bin/sh
+# Runs before Docker at boot (homelab-ups-gate.service). On battery and under 30%: this boot is the
+# 15-minute check after a low-battery shutdown, so set the next wake-up and power off again.
+# Otherwise carry on, and wake the NAS in case it powered off (normally it waits in Safe Mode).
+. /etc/default/homelab-ups
+for i in $(seq 30); do st=$(upsc ups@localhost ups.status 2>/dev/null) && break; sleep 2; done
+charge=$(upsc ups@localhost battery.charge 2>/dev/null | cut -d. -f1)
+case " $st " in
+  *" OB "*)
+    if [ "${charge:-100}" -lt 30 ]; then
+      runuser -u nut -- /usr/local/sbin/homelab-ups-event boot-off
+      /usr/sbin/rtcwake -m no -s 900
+      systemctl poweroff --no-block
+      exit 0
+    fi ;;
+esac
+[ -n "$NAS_MAC" ] && python3 -I -c 'import socket,sys
+m=bytes.fromhex(sys.argv[1].replace(":",""))
+s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.setsockopt(socket.SOL_SOCKET,socket.SO_BROADCAST,1)
+s.sendto(b"\xff"*6+m*16,("255.255.255.255",9))' "$NAS_MAC"
+exit 0
+EOF
+chmod 755 /usr/local/sbin/homelab-ups-event /usr/local/sbin/homelab-ups-poweroff /usr/local/sbin/homelab-ups-gate
+cat > /etc/systemd/system/homelab-ups-gate.service <<'EOF'
+[Unit]
+Description=Stay off while the UPS is still on low battery; else wake the NAS
+After=nut-server.service nut-driver.target
+Wants=nut-server.service
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/homelab-ups-gate
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable nut-server nut-monitor homelab-ups-gate
+systemctl restart nut-driver-enumerator.service 2>/dev/null || true
+systemctl restart nut-server nut-monitor
+sleep 5
+upsc ups@localhost ups.status 2>/dev/null | grep -q . || echo "WARNING: can't read the River (USB cable, or: journalctl -u 'nut-driver@*')"
+[[ -n $nas_mac ]] || echo "WARNING: NAS MAC not found, so no wake-on-LAN at boot (edit /etc/default/homelab-ups)"
 
 systemctl daemon-reload
 systemctl enable --now homelab-backup-db.timer homelab-watchdog.timer

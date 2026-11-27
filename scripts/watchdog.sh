@@ -14,7 +14,7 @@ cd "$(dirname "$0")/.."
 
 state=${XDG_STATE_HOME:-$HOME/.local/state}/homelab-watchdog
 mkdir -p "$state"; touch "$state/seen" "$state/reported" "$state/restarts"
-UPS=${UPS:-ups@192.168.10.7}
+UPS=${UPS:-ups@localhost}   # the EcoFlow River on this host's USB (bootstrap-host.sh)
 spool=${UPS_SPOOL:-/var/spool/homelab-ups}   # UPS events queued by homelab-ups-event (bootstrap-host.sh)
 
 problems() {
@@ -42,12 +42,15 @@ problems() {
       echo "Traefik started without its plugins: public sites give 404 (docker restart traefik)"
     fi
   fi
-  # UPS (on the NAS's USB; this host is a NUT client, docs/operations.md#ups)
+  # UPS (on this host's USB; the NAS is a network client of it, docs/operations.md#ups)
   if command -v upsc >/dev/null; then
-    systemctl is-active --quiet nut-monitor || echo "UPS monitor (nut-monitor) not running: no clean shutdown on power loss"
+    local u
+    for u in nut-server nut-monitor; do
+      systemctl is-active --quiet "$u" || echo "UPS service $u not running: no clean shutdown on power loss"
+    done
     local ups
     if ! ups=$(upsc "$UPS" ups.status 2>/dev/null); then
-      echo "UPS not readable through the NAS (USB cable, NAS or network): no clean shutdown on power loss"
+      echo "UPS not readable (USB cable or NUT driver): no clean shutdown on power loss"
     else
       if [[ " $ups " == *" RB "* ]]; then echo "UPS says its battery needs replacing"; fi
       if [[ " $ups " == *" OVER "* ]]; then echo "UPS overloaded"; fi

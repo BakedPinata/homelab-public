@@ -15,7 +15,7 @@ Docker networks must stay off these ranges: `/etc/docker/daemon.json` pins them 
 | Address | Device | Set by |
 |---|---|---|
 | `192.168.10.1` | UX7 (gateway) | The router's own address |
-| `192.168.10.7` | Synology NAS: shares, DSM `:5001`, Portainer `:9000`, Plex `:32400`, speedtest `:3000`, AdGuard secondary (DNS `:53`, UI `:3053`), UPS server `:3493` ([UPS](operations.md#ups)) | DHCP reservation |
+| `192.168.10.7` | Synology NAS: shares, DSM `:5001`, Portainer `:9000`, Plex `:32400`, speedtest `:3000`, AdGuard secondary (DNS `:53`, UI `:3053`) | DHCP reservation |
 | `192.168.10.101` | JetKVM | DHCP reservation |
 | `192.168.10.103` | Server: everything in `services/` | DHCP reservation for its network card (`enp0s31f6`) |
 | `192.168.10.171` | OctoPrint Pi | DHCP reservation |
@@ -37,6 +37,7 @@ Published on `192.168.10.103`; everything else is only reachable through Traefik
 | 8200 | Duplicati (fallback when Traefik is down) |
 | 6789, 8989, 7878, 5055 | nzbget, Sonarr, Radarr, Seerr |
 | 9001 | Portainer agent (the NAS's Portainer connects in) |
+| 3493 | NUT UPS server: the NAS and Home Assistant read the UPS ([UPS](operations.md#ups)) |
 | 2222 | Gitea git over SSH (`services/gitea`) |
 
 ## NAS shares
