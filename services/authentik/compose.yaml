@@ -1,6 +1,6 @@
 # Authentik: login gate (forward auth) for apps without their own login, and SSO. Own Postgres.
 x-authentik: &authentik
-  image: ghcr.io/goauthentik/server:2026.8.5
+  image: ghcr.io/goauthentik/server:2026.8.7
   restart: unless-stopped
   shm_size: 512mb
   environment:
