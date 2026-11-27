@@ -2,6 +2,7 @@
 # Prepare an Ubuntu host for the homelab. Safe to re-run.
 # Usage: sudo scripts/bootstrap-host.sh
 set -euo pipefail
+# apt-get waits up to 5 minutes for the package lock (Ubuntu's daily apt job can hold it)
 
 [[ $EUID -eq 0 ]] || { echo "Run with sudo: sudo $0"; exit 1; }
 OWNER="${SUDO_USER:?run via sudo from your normal user}"
@@ -11,8 +12,8 @@ NAS="//192.168.10.7"
 SHARES=(Downloads:Downloads Video:Video Docker:docker photos:Photos BACKUPS:Backups)
 
 echo "== Packages"
-apt-get update -qq
-apt-get install -y -qq docker.io docker-compose-v2 cifs-utils git gh gitleaks yamllint jq curl
+apt-get -o DPkg::Lock::Timeout=300 update -qq
+apt-get -o DPkg::Lock::Timeout=300 install -y -qq docker.io docker-compose-v2 cifs-utils git gh gitleaks yamllint jq curl
 usermod -aG docker "$OWNER"
 systemctl enable --now docker
 
@@ -167,7 +168,7 @@ echo "== UPS: NUT server for the EcoFlow RIVER 3 Plus (USB here), clean shutdown
 # wakes every 15 minutes and powers off again while still on battery (homelab-ups-gate). Once mains is
 # back it boots, reports OL, and the NAS leaves Safe Mode by rebooting itself (tested 2026-11-27).
 # Losing contact with the UPS never shuts anything down while it was last on mains.
-apt-get install -y -qq nut-server nut-client
+apt-get -o DPkg::Lock::Timeout=300 install -y -qq nut-server nut-client
 sed -i 's/^MODE=.*/MODE=netserver/' /etc/nut/nut.conf
 grep -q '^MODE=' /etc/nut/nut.conf || echo 'MODE=netserver' >> /etc/nut/nut.conf
 cat > /etc/udev/rules.d/62-homelab-ups.rules <<'EOF'
@@ -312,6 +313,8 @@ EOF
 systemctl daemon-reload
 systemctl enable nut-server nut-monitor homelab-ups-gate
 systemctl restart nut-driver-enumerator.service 2>/dev/null || true
+# Installing nut-server starts it on the package's empty config; it fails and hits systemd's start limit
+systemctl reset-failed nut-server nut-monitor 2>/dev/null || true
 systemctl restart nut-server nut-monitor
 sleep 5
 upsc ups@localhost ups.status 2>/dev/null | grep -q . || echo "WARNING: can't read the River (USB cable, or: journalctl -u 'nut-driver@*')"
