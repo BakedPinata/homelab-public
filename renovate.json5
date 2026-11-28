@@ -64,6 +64,11 @@
       groupName: 'adguard home',
     },
     {
+      // Agent matches the NAS's Portainer server (not in git). The agent's 3.x tags have no server to match
+      matchPackageNames: ['portainer/agent'],
+      allowedVersions: '<3',
+    },
+    {
       // A database major version needs a dump and restore: approve it on the Dependency Dashboard
       matchPackageNames: ['postgres', 'lscr.io/linuxserver/mariadb', 'couchdb', 'docker.io/valkey/valkey'],
       matchUpdateTypes: ['major'],
