@@ -1,7 +1,7 @@
 // Renovate (R6): the Renovate GitHub App opens update PRs; merging one deploys it.
 // Auto-merge (decided 2026-10-21): CI tooling, the tools and media stacks (minor/patch), and
 // linuxserver.io rebuilds, each once the release is 3 days old. Everything else waits for the owner.
-// lscr.io doesn't always give release timestamps: rebuilds without one merge once validate passes.
+// lscr.io and ghcr.io don't always give release timestamps: those updates merge once validate passes.
 {
   $schema: 'https://docs.renovatebot.com/renovate-schema.json',
   extends: ['config:recommended'],
@@ -89,6 +89,7 @@
       matchUpdateTypes: ['minor', 'patch'],
       automerge: true,
       minimumReleaseAge: '3 days',
+      minimumReleaseAgeBehaviour: 'timestamp-optional',  // ghcr.io gives Seerr no release date: else pending forever (#66)
     },
     {
       // Weekly linuxserver.io rebuilds: same app version, new -ls number
