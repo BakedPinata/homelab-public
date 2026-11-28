@@ -60,7 +60,7 @@ Restores into an empty database, on the Authentik version the dump was made with
 4. `docker compose up -d --wait`, then sign in. `AUTHENTIK_SECRET_KEY` must be the one from before, or stored secrets can't be read.
 
 ## Postgres major upgrade
-A new major can't read the old data files, so a tag bump alone fails: Renovate's database-major PR is only the reminder. Do it by hand, with the stack's changes uncommitted until it works (deploys refuse meanwhile). Done this way for 16 → 18 on 2026-10-28, about 1.5 minutes of Authentik downtime.
+A new major can't read the old data files, and from 18 on a tag bump alone doesn't even fail: the new image finds `<new>/docker` empty, creates a new empty database, the app sets itself up on it and passes its healthcheck, so the deploy reports success with no users or settings (the old data stays in `<old>/docker`). Never merge Renovate's database-major PR: it's only the reminder. Wait until the app's release notes list the new major. Do it by hand, with the stack's changes uncommitted until it works (deploys refuse meanwhile). Done this way for 16 → 18 on 2026-10-28, about 1.5 minutes of Authentik downtime.
 1. Read the release notes of Authentik (supported Postgres versions) and of the Postgres image (data path changes). Pull the new image first.
 2. `docker compose stop authentik_server authentik_worker`, so nothing writes from here.
 3. Count every table's rows into a file (query `information_schema.tables`, one `count(*)` each) for the comparison in step 6.
