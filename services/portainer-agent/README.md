@@ -8,6 +8,7 @@ The agent's version matches the Portainer server's on the NAS. The server isn't 
 
 ## Upgrading
 Server first, then the agent to the same version:
-1. NAS over SSH: `sudo docker ps` for the container name, `sudo docker inspect <name>` to note its ports, mounts and restart policy, then copy its data folder.
+1. NAS over SSH (`docs/operations.md#nas-over-ssh`): `sudo docker ps` for the container name, `sudo docker inspect <name>` to note its ports, mounts and restart policy, then copy its data folder.
 2. `sudo docker pull portainer/portainer-ce:<version>`, `sudo docker stop <name> && sudo docker rm <name>`, and `sudo docker run -d` with the same name, ports, mounts and restart policy on the new image. Data stays in the mount.
+   As set up (2026-11-28): `sudo docker run -d --name portainer --restart always -p 8000:8000 -p 9000:9000 -v /var/run/docker.sock:/var/run/docker.sock -v /volume1/DOCKER/Portainer:/data portainer/portainer-ce:<version>`. Stop it before copying `/volume1/DOCKER/Portainer` so the database copy is consistent.
 3. Check `http://192.168.10.7:9000/api/system/status` shows the new version, then merge the agent's Renovate PR (or set the tag in `compose.yaml`). The environment shows as up in Portainer.
